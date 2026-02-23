@@ -12,6 +12,7 @@ local global_storage_subgroup = {
 local global_chest_entity = table.deepcopy(data.raw["linked-container"]["linked-chest"])
 global_chest_entity.name = constants.GLOBAL_CHEST_ENTITY_NAME
 global_chest_entity.inventory_type = "with_filters_and_bar"
+global_chest_entity.inventory_size = settings.startup["global-storage-chest-slots"].value
 global_chest_entity.minable.result = global_chest_entity.name
 
 -- Item

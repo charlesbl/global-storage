@@ -78,13 +78,13 @@ local function on_entity_settings_pasted(event)
         local recipe = source.get_recipe()
         if not recipe then return end
 
-        -- Get network name from recipe name
-        local network_name = recipe.name
+        -- Build network name from recipe (e.g. "craft:iron-gear-wheel")
+        local network_name = constants.COPY_PASTE_NETWORK_PREFIX .. recipe.name
 
         -- Check if network exists BEFORE creating it
         local is_new_network = (storage.networks[network_name] == nil)
 
-        -- Update chest link_id to match recipe (always)
+        -- Update chest link_id to match recipe network
         network_module.set_chest_network(destination, network_name)
 
         -- Only set requests and block slots for NEW networks
@@ -250,7 +250,6 @@ local function on_gui_closed(event)
 
         -- Re-open the chest if we have a valid reference
         if chest_unit_number then
-            local player_data = state.get_player_data(event.player_index)
             local chest = player_data.opened_chest
             if chest and chest.valid and chest.unit_number == chest_unit_number then
                 player.opened = chest
@@ -266,7 +265,6 @@ local function on_gui_closed(event)
 
         -- Re-open the chest if we have a valid reference
         if chest_unit_number then
-            local player_data = state.get_player_data(event.player_index)
             local chest = player_data.opened_provider_chest
             if chest and chest.valid and chest.unit_number == chest_unit_number then
                 player.opened = chest

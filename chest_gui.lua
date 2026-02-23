@@ -10,9 +10,9 @@ local GUI = constants.GUI
 --- The panel will automatically show/hide when the vanilla linked container GUI opens/closes
 ---@param player LuaPlayer
 function M.create_relative_panel(player)
-    -- Don't recreate if it already exists
+    -- Destroy and recreate to ensure latest layout
     if player.gui.relative[GUI.CHEST_RELATIVE_PANEL] then
-        return
+        player.gui.relative[GUI.CHEST_RELATIVE_PANEL].destroy()
     end
 
     -- Main frame anchored to the linked container GUI
@@ -27,6 +27,7 @@ function M.create_relative_panel(player)
             name = constants.GLOBAL_CHEST_ENTITY_NAME  -- Only show for our chest
         }
     })
+    frame.style.minimal_width = 380
 
     -- Inner frame for content
     local inner = frame.add({
@@ -92,7 +93,7 @@ function M.create_relative_panel(player)
         name = GUI.CHEST_NETWORK_ID_FIELD,
         text = ""
     })
-    network_field.style.width = 150
+    network_field.style.width = 220
 
     -- Row 2: Buttons (Validate + Cancel)
     local edit_row2 = edit_flow.add({
@@ -121,7 +122,7 @@ function M.create_relative_panel(player)
         name = GUI.CHEST_NETWORK_LIST_SCROLL,
         direction = "vertical"
     })
-    list_scroll.style.maximal_height = 120
+    list_scroll.style.maximal_height = 325
     list_scroll.style.horizontally_stretchable = true
 
     -- === Requests Section ===
@@ -135,17 +136,19 @@ function M.create_relative_panel(player)
     local requests_scroll = inner.add({
         type = "scroll-pane",
         name = GUI.CHEST_REQUEST_SLOT_FLOW,
-        direction = "vertical"
+        direction = "vertical",
+        horizontal_scroll_policy = "never"
     })
-    requests_scroll.style.maximal_height = 200
+    requests_scroll.style.maximal_height = 300
     requests_scroll.style.horizontally_stretchable = true
 
     local requests_flow = requests_scroll.add({
-        type = "flow",
+        type = "table",
         name = "requests_flow",
-        direction = "horizontal"
+        column_count = 7
     })
     requests_flow.style.horizontal_spacing = 4
+    requests_flow.style.vertical_spacing = 4
 end
 
 --- Update the relative panel content with the current chest's data
@@ -266,6 +269,11 @@ function M.create_single_slot(parent, index, item_name, min, max)
             tags = { slot_index = index, item_name = nil }
         })
         slot.style.size = 40
+        -- Spacers to match the height of filled slots (min + max labels)
+        local spacer1 = slot_flow.add({ type = "label", caption = "" })
+        spacer1.style.font = "default-small"
+        local spacer2 = slot_flow.add({ type = "label", caption = "" })
+        spacer2.style.font = "default-small"
     end
 end
 

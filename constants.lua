@@ -73,6 +73,7 @@ M.GUI = {
     INVENTORY_EDIT_UNLIMITED_CB = "gn_inv_edit_unlimited",
     INVENTORY_EDIT_PIN_CB = "gn_inv_edit_pin",
     INVENTORY_EDIT_CONFIRM = "gn_inv_edit_confirm",
+    INVENTORY_EDIT_REMOVE = "gn_inv_edit_remove",
 
     -- HUD pins
     PIN_HUD_FRAME = "gn_pin_hud_frame",
@@ -108,6 +109,9 @@ M.GUI = {
     AUTO_PIN_HUD_FLOW = "gn_auto_pin_hud_flow_",
     AUTO_PIN_HUD_LABEL = "gn_auto_pin_hud_label_",
 }
+
+-- Copy-paste network naming
+M.COPY_PASTE_NETWORK_PREFIX = "craft:"
 
 -- Processing
 M.PROCESS_INTERVAL = 10  -- ticks between processing runs

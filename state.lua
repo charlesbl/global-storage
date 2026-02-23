@@ -2,19 +2,12 @@ local constants = require("constants")
 
 local M = {}
 
---- Hash function to convert network name to link_id
---- Same algorithm as original chest_ids.lua
----@param name string Network name
+--- Allocate a new unique link_id using a sequential counter
 ---@return number link_id
-function M.get_link_id(name)
-    if not name or name == "" then
-        return 0
-    end
-    local hash = 0
-    for i = 1, #name do
-        hash = (hash * i + string.byte(name, i) * i) % (2 ^ 32)
-    end
-    return hash
+function M.allocate_link_id()
+    local id = storage.next_link_id or 1
+    storage.next_link_id = id + 1
+    return id
 end
 
 --- Initialize storage structure for new game
@@ -28,14 +21,17 @@ function M.init()
     storage.provider_chests = storage.provider_chests or {}  -- Provider chests with per-chest requests
     storage.chest_networks = storage.chest_networks or {}  -- unit_number → network_name (for reliable tracking)
 
-    -- Migration: add cached link_id to existing networks and rebuild reverse mapping
+    -- Initialize sequential link_id counter
+    storage.next_link_id = storage.next_link_id or 1
+
+    -- Rebuild reverse mapping and ensure counter stays ahead of all allocated IDs
     for name, network in pairs(storage.networks) do
-        local link_id = M.get_link_id(name)
-        if not network.link_id then
-            network.link_id = link_id
+        if network.link_id then
+            storage.link_id_to_network[network.link_id] = name
+            if network.link_id >= storage.next_link_id then
+                storage.next_link_id = network.link_id + 1
+            end
         end
-        -- Ensure reverse mapping exists
-        storage.link_id_to_network[link_id] = name
     end
 
     -- Reset round-robin state for rebuild
@@ -88,12 +84,12 @@ function M.get_or_create_network(name, manual)
     end
 
     if not storage.networks[name] then
-        local link_id = M.get_link_id(name)
+        local link_id = M.allocate_link_id()
         storage.networks[name] = {
             chest_count = 0,
             requests = {},
             manual = manual or false,
-            link_id = link_id  -- Cache hash for processor performance
+            link_id = link_id
         }
         -- Store reverse mapping
         storage.link_id_to_network[link_id] = name
@@ -145,7 +141,7 @@ function M.delete_network(name, force)
     if not network then return end
 
     -- Transfer items from linked inventory to global pool
-    local link_id = M.get_link_id(name)
+    local link_id = network.link_id
     local linked_inv = force.get_linked_inventory(constants.GLOBAL_CHEST_ENTITY_NAME, link_id)
 
     if linked_inv then
@@ -214,12 +210,14 @@ end
 ---@param new_network_name string|nil Target network (nil = default)
 ---@return number count Number of chests reassigned
 function M.reassign_network_chests(old_network_name, new_network_name)
-    local old_link_id = M.get_link_id(old_network_name)
-    local target_network = new_network_name or constants.DEFAULT_NETWORK_NAME
-    local new_link_id = M.get_link_id(target_network)
+    local old_network = storage.networks[old_network_name]
+    if not old_network then return 0 end
+    local old_link_id = old_network.link_id
 
-    -- Ensure target network exists
-    M.get_or_create_network(target_network)
+    local target_network_name = new_network_name or constants.DEFAULT_NETWORK_NAME
+    local target_net = M.get_or_create_network(target_network_name)
+    if not target_net then return 0 end
+    local new_link_id = target_net.link_id
 
     local count = 0
 
@@ -232,17 +230,14 @@ function M.reassign_network_chests(old_network_name, new_network_name)
         for _, chest in pairs(chests) do
             if chest.valid and chest.link_id == old_link_id then
                 chest.link_id = new_link_id
-                M.set_chest_tracked_network(chest.unit_number, target_network)
+                M.set_chest_tracked_network(chest.unit_number, target_network_name)
                 count = count + 1
             end
         end
     end
 
     -- Update target network chest count
-    if storage.networks[target_network] then
-        storage.networks[target_network].chest_count =
-            (storage.networks[target_network].chest_count or 0) + count
-    end
+    target_net.chest_count = (target_net.chest_count or 0) + count
 
     return count
 end

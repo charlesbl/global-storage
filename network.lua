@@ -62,13 +62,11 @@ function M.set_chest_network(chest, new_network_name, manual)
 
     -- Set new link_id and update tracking
     if new_network_name and new_network_name ~= "" then
-        local new_link_id = state.get_link_id(new_network_name)
-        chest.link_id = new_link_id
-        state.set_chest_tracked_network(chest.unit_number, new_network_name)
-
-        -- Create network if needed and increment chest count
+        -- Create network if needed (allocates link_id) and increment chest count
         local network = state.get_or_create_network(new_network_name, manual)
         if network then
+            chest.link_id = network.link_id
+            state.set_chest_tracked_network(chest.unit_number, new_network_name)
             network.chest_count = (network.chest_count or 0) + 1
         end
     else

@@ -81,7 +81,8 @@ function M.create(player)
         direction = "vertical"
     })
     frame.auto_center = true
-    frame.style.minimal_width = 500
+    frame.style.minimal_width = 550
+    frame.style.maximal_width = 700
 
     -- Tabbed pane
     local tabbed_pane = frame.add({
@@ -147,7 +148,7 @@ function M.build_networks_tab(parent, player)
         name = GUI.NETWORKS_SCROLL,
         direction = "vertical"
     })
-    scroll.style.maximal_height = 400
+    scroll.style.maximal_height = 600
 
     -- Networks table
     local networks_table = scroll.add({
@@ -179,11 +180,13 @@ function M.build_networks_tab(parent, player)
         local is_ghost = chest_count == 0
 
         -- Network name
-        networks_table.add({
+        local name_label = networks_table.add({
             type = "label",
             name = "gn_net_name_" .. network_name,
-            caption = network_name
+            caption = network_name,
+            tooltip = network_name
         })
+        name_label.style.maximal_width = 250
 
         -- Requests count
         local reqs_label = networks_table.add({
@@ -270,8 +273,8 @@ function M.build_inventory_tab(parent, player)
         name = GUI.INVENTORY_SCROLL,
         direction = "vertical"
     })
-    scroll.style.maximal_height = 400
-    scroll.style.minimal_width = 480
+    scroll.style.maximal_height = 600
+    scroll.style.minimal_width = 520
 
     -- Inventory grid (10 columns)
     local grid = scroll.add({
@@ -575,10 +578,20 @@ function M.open_inventory_edit_popup(player, item_name)
         tags = { item_name = item_name }
     })
 
-    -- Confirm button
+    -- Confirm/remove buttons
     local button_flow = popup.add({ type = "flow", direction = "horizontal" })
     button_flow.style.top_margin = 8
     button_flow.style.horizontal_align = "right"
+    if quantity == 0 then
+        button_flow.add({
+            type = "button",
+            name = GUI.INVENTORY_EDIT_REMOVE,
+            caption = { "gui.gn-remove-item" },
+            style = "red_button",
+            tooltip = { "gui.gn-remove-item-tooltip" },
+            tags = { item_name = item_name }
+        })
+    end
     local spacer2 = button_flow.add({ type = "empty-widget" })
     spacer2.style.horizontally_stretchable = true
     button_flow.add({
@@ -1271,6 +1284,38 @@ function M.on_gui_click(event)
             if frame then
                 player.opened = frame
             end
+        end
+        return
+    end
+
+    -- Remove item entry (only available when stock is 0)
+    if element.name == GUI.INVENTORY_EDIT_REMOVE then
+        local item_name = tags and tags.item_name
+        if item_name then
+            storage.inventory[item_name] = nil
+            storage.limits[item_name] = nil
+            storage.previous_limits[item_name] = nil
+            for _, pdata_entry in pairs(storage.player_data) do
+                if pdata_entry.pinned_items then pdata_entry.pinned_items[item_name] = nil end
+                if pdata_entry.auto_pinned_items then pdata_entry.auto_pinned_items[item_name] = nil end
+                if pdata_entry.pin_hud_elements and pdata_entry.pin_hud_elements[item_name] then
+                    local elems = pdata_entry.pin_hud_elements[item_name]
+                    if elems.flow and elems.flow.valid then elems.flow.destroy() end
+                    pdata_entry.pin_hud_elements[item_name] = nil
+                end
+                if pdata_entry.auto_pin_hud_elements and pdata_entry.auto_pin_hud_elements[item_name] then
+                    local elems = pdata_entry.auto_pin_hud_elements[item_name]
+                    if elems.flow and elems.flow.valid then elems.flow.destroy() end
+                    pdata_entry.auto_pin_hud_elements[item_name] = nil
+                end
+            end
+        end
+        M.destroy_inventory_edit_popup(player)
+        M.rebuild_inventory_tab(player)
+        local pdata = state.get_player_data(player.index)
+        if pdata.opened_network_gui then
+            local frame = player.gui.screen[GUI.NETWORK_FRAME]
+            if frame then player.opened = frame end
         end
         return
     end
