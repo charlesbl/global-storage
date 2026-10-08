@@ -76,6 +76,7 @@ M.GUI = {
     INVENTORY_SEARCH_CLEAR = "gn_inventory_search_clear",
     INVENTORY_EMPTY_LABEL = "gn_inventory_empty",
     PIN_SORT = "gn_pin_sort",
+    INVENTORY_SORT = "gn_inventory_sort",
 
     -- Dynamic element prefixes (for live updates)
     INVENTORY_QUANTITY_LABEL = "gn_inv_qty_",

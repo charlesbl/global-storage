@@ -281,6 +281,7 @@ function M.get_player_data(player_index)
     if not pdata.inventory_grid_cache then pdata.inventory_grid_cache = {} end
     if not pdata.inventory_search then pdata.inventory_search = "" end
     if not pdata.pin_sort then pdata.pin_sort = 1 end
+    if not pdata.inventory_sort then pdata.inventory_sort = 1 end
     if pdata.opened_provider_chest == nil then pdata.opened_provider_chest = nil end
     if pdata.auto_pin_low_stock_enabled == nil then pdata.auto_pin_low_stock_enabled = false end
     if not pdata.auto_pinned_items then pdata.auto_pinned_items = {} end

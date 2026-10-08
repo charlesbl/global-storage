@@ -73,6 +73,11 @@ local frame = player.gui.screen.add({name = G.NETWORK_FRAME, type = 'frame'})
 local tabs = frame.add({name = G.NETWORK_TABS, type = 'tabbed-pane', selected_tab_index = 2})
 local content = tabs.add({type = 'frame'})
 gui.build_inventory_tab(content, player)
+local player_content = tabs.add({type = 'frame'})
+gui.build_player_logistics_tab(player_content, player)
+assert(gui.find_element(content, G.PIN_SORT) == nil)
+assert(gui.find_element(player_content, G.PIN_SORT).valid)
+assert(gui.find_element(content, G.INVENTORY_SORT).valid)
 local field = gui.find_element(frame, G.INVENTORY_SEARCH)
 local function search(text)
     field.text = text
@@ -142,6 +147,28 @@ gui.sort_pin_hud(player)
 assert(hud[G.PIN_HUD_AUTO_SECTION].children[1].name == G.PIN_HUD_AUTO_HEADER)
 assert(hud[G.PIN_HUD_AUTO_SECTION].children[2].name == G.AUTO_PIN_HUD_FLOW .. 'iron')
 
+-- Each tab owns its own persistent selector; all six modes sort the grid.
+search('')
+local inventory_dropdown = gui.find_element(content, G.INVENTORY_SORT)
+for index, mode in ipairs(view.sort_modes) do
+    inventory_dropdown.selected_index = index
+    gui.on_gui_selection_state_changed({element = inventory_dropdown, player_index = 1})
+    assert(table.concat(pdata.inventory_order, ',') == table.concat(view.sorted(items, pdata, mode), ','))
+    assert(pdata.pin_sort == 4 and dropdown.selected_index == 4)
+end
+inventory_dropdown.selected_index = 4
+gui.on_gui_selection_state_changed({element = inventory_dropdown, player_index = 1})
+storage.inventory.copper = 100
+gui.update_live(player)
+assert(pdata.inventory_order[1] == 'copper')
+assert(field.valid and inventory_dropdown.valid)
+storage.inventory.copper = 80
+gui.update_live(player)
+assert(pdata.inventory_order[1] == 'iron')
+search('minerai')
+assert(#pdata.inventory_order == 1 and pdata.inventory_order[1] == 'iron')
+assert(pdata.inventory_sort == 4 and pdata.pin_sort == 4)
+
 storage.networks['craft:iron #2'] = {entity_name = C.GLOBAL_CRAFT_CHEST_ENTITY_NAME, craft_recipe = 'iron'}
 assert(state.network_caption('craft:iron #2') == 'craft: [recipe=iron] #2')
 assert(storage.networks['craft:iron #2'].craft_recipe == 'iron')
@@ -154,6 +181,7 @@ assert(state.network_caption('craft:iron #2') == 'craft:iron #2')
 gui.on_player_locale_changed({player_index = 1})
 assert(pdata.item_names.iron == nil and pdata.inventory_view_dirty == false)
 assert(pdata.pin_sort == 4 and pdata.inventory_search == 'minerai')
+assert(pdata.inventory_sort == 4)
 
 -- New entries are picked up while open; failed translations fall back safely.
 prototypes.item.new = {localised_name = 'Unknown translation'}
@@ -190,5 +218,5 @@ assert(not old_hud.valid and compact_hud ~= old_hud)
 assert(gui.find_element(compact_hud, G.PIN_SORT) == nil)
 assert(pdata.pin_sort == 4 and gui.find_element(frame, G.PIN_SORT).valid)
 ''')
-print("Passed: Lua syntax, translated/literal search, focus and filters, six pin sorts,")
-print("live HUD reorder, per-player settings, recipe icon captions and locale changes.")
+print("Passed: Lua syntax, translated/literal search, focus and filters,")
+print("independent inventory/HUD sorting, live stock reorder, recipe icons and locale changes.")

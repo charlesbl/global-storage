@@ -68,11 +68,15 @@ Search the inventory by translated or internal item name. Search ignores case
 and accents, works together with the no-limit filter, and remembers the query
 for each player. Clear it with the button beside the search field.
 
-Sort pinned HUD items from the inventory tab. The HUD contains only item rows. Choose
+Sort pinned HUD items from the Player tab. The HUD contains only item rows. Choose
 name A–Z/Z–A, quantity ascending/descending, or fill ratio ascending/descending.
 Manual and automatic pins keep their separate sections; automatic selection
 still prioritizes the ten lowest stock ratios. Items with unlimited or zero
 limits appear last when sorting by fill ratio. The choice is saved per player.
+
+The Global Inventory tab has its own independent sort selector with the same
+six modes, applied to the inventory grid. Search and the no-limit filter work
+with every sort mode. Quantity and fill-ratio ordering follows stock changes.
 
 Craft networks display `craft:` with their recipe icon in the network list and
 craft chest panel. Hover over the name to see the persistent network ID.

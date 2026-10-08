@@ -259,7 +259,7 @@ function M.build_inventory_tab(parent, player)
     field.style.width = 300
     search_row.add({ type = "sprite-button", name = GUI.INVENTORY_SEARCH_CLEAR,
         sprite = "utility/close", style = "tool_button", tooltip = { "gui.global-storage-clear-search" } })
-    M.add_pin_sort_control(parent, pdata)
+    M.add_sort_control(parent, GUI.INVENTORY_SORT, "gui.global-storage-inventory-sort", pdata.inventory_sort)
 
     -- Filter checkbox + hint
     local filter_flow = parent.add({
@@ -334,26 +334,33 @@ function M.refresh_inventory_grid(player)
         if (not pdata.filter_no_limit or limit == nil or limit == 0)
            and inventory_view.matches(name, pdata.inventory_search, pdata) then matches[name] = true end
     end
-    local names = inventory_view.sorted(matches, pdata, "name")
+    local names = inventory_view.sorted(matches, pdata, inventory_view.sort_modes[pdata.inventory_sort])
     grid.clear()
     pdata.inventory_grid_cache = {}
     for _, name in ipairs(names) do M.add_grid_cell(grid, name, pdata) end
     local empty = M.find_element(frame, GUI.INVENTORY_EMPTY_LABEL)
     if empty then empty.visible = #names == 0 end
     pdata.inventory_items = all_items
+    pdata.inventory_order = names
+    pdata.inventory_limits = {}
+    for name in pairs(all_items) do pdata.inventory_limits[name] = storage.limits[name] end
     pdata.inventory_view_dirty = false
 end
 
 function M.add_pin_sort_control(parent, pdata)
+    M.add_sort_control(parent, GUI.PIN_SORT, "gui.global-storage-pin-sort", pdata.pin_sort)
+end
+
+function M.add_sort_control(parent, name, caption, selected_index)
     local row = parent.add({ type = "flow", direction = "horizontal" })
     row.style.vertical_align = "center"
-    row.add({ type = "label", caption = { "gui.global-storage-pin-sort" } })
+    row.add({ type = "label", caption = { caption } })
     local items = {}
     for _, mode in ipairs(inventory_view.sort_modes) do
         items[#items + 1] = { "gui.global-storage-sort-" .. mode }
     end
-    row.add({ type = "drop-down", name = GUI.PIN_SORT, items = items,
-        selected_index = pdata.pin_sort }).style.width = 200
+    row.add({ type = "drop-down", name = name, items = items,
+        selected_index = selected_index }).style.width = 200
 end
 
 -- Reorder existing HUD rows rather than destroying them on every stock update.
@@ -481,6 +488,7 @@ end
 ---@param player LuaPlayer
 function M.build_player_logistics_tab(parent, player)
     local player_data = state.get_player_data(player.index)
+    M.add_pin_sort_control(parent, player_data)
 
     -- Description
     parent.add({
@@ -1598,12 +1606,18 @@ end
 
 function M.on_gui_selection_state_changed(event)
     local element = event.element
-    if not element or not element.valid or element.name ~= GUI.PIN_SORT then return end
+    if not element or not element.valid then return end
+    if element.name ~= GUI.PIN_SORT and element.name ~= GUI.INVENTORY_SORT then return end
     local player = game.get_player(event.player_index)
     if not player or not inventory_view.sort_modes[element.selected_index] then return end
     local pdata = state.get_player_data(player.index)
-    pdata.pin_sort = element.selected_index
-    M.sort_pin_hud(player)
+    if element.name == GUI.PIN_SORT then
+        pdata.pin_sort = element.selected_index
+        M.sort_pin_hud(player)
+    else
+        pdata.inventory_sort = element.selected_index
+        M.refresh_inventory_grid(player)
+    end
 end
 
 function M.on_string_translated(event)
@@ -1679,6 +1693,18 @@ function M.update_live(player)
         for name in pairs(current) do if not previous[name] then changed = true; break end end
         if not changed then
             for name in pairs(previous) do if not current[name] then changed = true; break end end
+        end
+        if not changed then
+            for name in pairs(current) do
+                if (pdata.inventory_limits or {})[name] ~= storage.limits[name] then changed = true; break end
+            end
+        end
+        if not changed and pdata.inventory_sort > 2 then
+            local order = inventory_view.sorted(pdata.inventory_grid_cache, pdata,
+                inventory_view.sort_modes[pdata.inventory_sort])
+            for index, name in ipairs(order) do
+                if (pdata.inventory_order or {})[index] ~= name then changed = true; break end
+            end
         end
         if changed then M.refresh_inventory_grid(player) end
         -- Update inventory grid quantities using cached references
