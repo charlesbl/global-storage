@@ -18,7 +18,8 @@ All three chests use the craft chest's industrial body, frame and latch, with
 custom skins and matching inventory icons:
 green with a network symbol for storage, blue with a gear for crafting, and
 orange with a logistic robot for the provider. Entity sprites are 64 × 64 pixels
-and inventory icons are 32 × 32 pixels; the entity canvas occupies one tile.
+and inventory icons are 32 × 32 pixels. The sprite scale compensates for
+transparent margins so the visible chest fills the tile like a vanilla chest.
 The provider uses a static
 closed-lid sprite when opened; its logistics behaviour is unchanged.
 

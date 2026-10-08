@@ -16,7 +16,9 @@ local function apply_skin(entity, item, skin)
         width = 64,
         height = 64,
         shift = { 0, -0.0625 },
-        scale = 0.5,
+        -- The chest occupies about 54 of the 64 pixels; match vanilla's
+        -- 33-pixel visible width instead of scaling the transparent canvas.
+        scale = 0.625,
     }
     if entity.animation then
         -- A single closed-lid frame keeps the custom provider sprite visible.

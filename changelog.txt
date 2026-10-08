@@ -10,6 +10,7 @@ Date: 2026-10-08
     - Show compact item/quantity/slot grids, paginate sections exceeding 16 items, and warn when chest capacity is exceeded.
     - Give all three chests matching industrial bodies and icons: green network storage, blue craft gear and orange logistic robot.
     - Use 64-pixel entity sprites and 32-pixel icons; the provider has a static closed-lid sprite.
+    - Compensate for sprite transparency margins so all three skins fill the tile at vanilla chest size.
     - Add a native signal selector to network IDs and display resource icons in network names.
     - Sort network lists alphabetically, ignoring case and resource icon tags.
     - Copy/paste provider requests and chest settings with vanilla Shift mouse shortcuts; accept recipes from assemblers and furnaces.
