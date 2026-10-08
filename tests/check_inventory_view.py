@@ -128,10 +128,12 @@ local hud = player.gui.left[G.PIN_HUD_FRAME]
 local dropdown = gui.find_element(frame, G.PIN_SORT)
 dropdown.selected_index = 4
 gui.on_gui_selection_state_changed({element = dropdown, player_index = 1})
-assert(gui.find_element(hud, G.PIN_SORT).selected_index == 4)
+assert(gui.find_element(hud, G.PIN_SORT) == nil)
 assert(hud[G.PIN_HUD_MANUAL_SECTION].children[1].name == G.PIN_HUD_FLOW .. 'copper')
 storage.inventory.iron = 90
+pdata.hud_needs_refresh = false
 gui.update_pin_hud(player)
+assert(player.gui.left[G.PIN_HUD_FRAME] == hud, 'Compact HUD was unnecessarily rebuilt')
 assert(hud[G.PIN_HUD_MANUAL_SECTION].children[1].name == G.PIN_HUD_FLOW .. 'iron')
 assert(state.get_player_data(1).pin_sort == 4)
 gui.add_auto_pin_to_hud(player, 'copper', 0.05)
@@ -178,6 +180,15 @@ gui.on_gui_click({player_index = 1, element = {valid = true, name = G.INVENTORY_
     tags = {item_name = 'new'}}})
 assert(not row.valid and pdata.pinned_items.new == nil)
 assert(pdata.inventory_grid_cache.new == nil)
+
+-- Saved HUDs from the previous layout lose the dropdown on their next refresh.
+local old_hud = player.gui.left[G.PIN_HUD_FRAME]
+gui.add_pin_sort_control(old_hud, pdata)
+gui.update_pin_hud(player)
+local compact_hud = player.gui.left[G.PIN_HUD_FRAME]
+assert(not old_hud.valid and compact_hud ~= old_hud)
+assert(gui.find_element(compact_hud, G.PIN_SORT) == nil)
+assert(pdata.pin_sort == 4 and gui.find_element(frame, G.PIN_SORT).valid)
 ''')
 print("Passed: Lua syntax, translated/literal search, focus and filters, six pin sorts,")
 print("live HUD reorder, per-player settings, recipe icon captions and locale changes.")

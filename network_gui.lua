@@ -711,7 +711,6 @@ function M.get_or_create_hud(player)
         direction = "vertical"
     })
     frame.style.padding = 4
-    M.add_pin_sort_control(frame, state.get_player_data(player.index))
 
     -- Create manual section (vertical flow for rows)
     frame.add({
@@ -1051,7 +1050,7 @@ function M.update_pin_hud(player)
     -- Also check if existing HUD has correct structure
     if frame and frame.valid then
         local manual_section = frame[GUI.PIN_HUD_MANUAL_SECTION]
-        if not manual_section or manual_section.type ~= "flow" or not M.find_element(frame, GUI.PIN_SORT) then
+        if not manual_section or manual_section.type ~= "flow" or M.find_element(frame, GUI.PIN_SORT) then
             needs_refresh = true
         end
     end
@@ -1604,10 +1603,6 @@ function M.on_gui_selection_state_changed(event)
     if not player or not inventory_view.sort_modes[element.selected_index] then return end
     local pdata = state.get_player_data(player.index)
     pdata.pin_sort = element.selected_index
-    for _, surface in ipairs({ player.gui.screen, player.gui.left }) do
-        local dropdown = M.find_element(surface, GUI.PIN_SORT)
-        if dropdown then dropdown.selected_index = pdata.pin_sort end
-    end
     M.sort_pin_hud(player)
 end
 

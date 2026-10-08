@@ -68,7 +68,7 @@ Search the inventory by translated or internal item name. Search ignores case
 and accents, works together with the no-limit filter, and remembers the query
 for each player. Clear it with the button beside the search field.
 
-Sort pinned HUD items from the inventory tab or directly above the HUD. Choose
+Sort pinned HUD items from the inventory tab. The HUD contains only item rows. Choose
 name A–Z/Z–A, quantity ascending/descending, or fill ratio ascending/descending.
 Manual and automatic pins keep their separate sections; automatic selection
 still prioritizes the ten lowest stock ratios. Items with unlimited or zero
