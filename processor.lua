@@ -2,6 +2,8 @@ local constants = require("constants")
 local state = require("state")
 local network_module = require("network")
 local player_logistics = require("player_logistics")
+local pool_items = require("pool_items")
+local craft_requests = require("craft_requests")
 
 local M = {}
 
@@ -10,19 +12,14 @@ local M = {}
 ---@param network table Network data
 ---@param force LuaForce
 local function process_network(network_name, network, force)
-    -- Use cached link_id (falls back to calculation if missing)
-    local link_id = network.link_id or state.get_link_id(network_name)
-    local linked_inv = force.get_linked_inventory(constants.GLOBAL_CHEST_ENTITY_NAME, link_id)
+    if network.entity_name == constants.GLOBAL_CRAFT_CHEST_ENTITY_NAME then craft_requests.ensure(network_name, network) end
+    local link_id = network.link_id
+    if not link_id then return end
+    local linked_inv = force.get_linked_inventory(network.entity_name or constants.GLOBAL_CHEST_ENTITY_NAME, link_id)
 
     if not linked_inv then return end
 
-    local contents = linked_inv.get_contents()
-
-    -- Build a lookup table for faster access
-    local content_counts = {}
-    for _, item in pairs(contents) do
-        content_counts[item.name] = (content_counts[item.name] or 0) + item.count
-    end
+    local content_counts = pool_items.get_counts(linked_inv)
 
     -- 1. Collect surplus (items above max or not in requests)
     for item_name, count in pairs(content_counts) do
@@ -48,7 +45,7 @@ local function process_network(network_name, network, force)
             end
 
             if can_accept > 0 then
-                local removed = linked_inv.remove({ name = item_name, count = can_accept })
+                local removed = linked_inv.remove({ name = item_name, quality = "normal", count = can_accept })
                 if removed > 0 then
                     storage.inventory[item_name] = (storage.inventory[item_name] or 0) + removed
                 end
@@ -123,16 +120,7 @@ end
 --- Main processing function - called every PROCESS_INTERVAL ticks
 --- Uses round-robin to distribute load across multiple ticks
 function M.process()
-    -- Get active force (first force with players)
-    local active_force = nil
-    for _, force in pairs(game.forces) do
-        if #force.players > 0 then
-            active_force = force
-            break
-        end
-    end
-    if not active_force then return end
-
+    state.migrate_network_types()
     -- Rebuild network list if invalidated
     if not storage.network_list then
         M.rebuild_network_list()
@@ -141,7 +129,7 @@ function M.process()
     local list = storage.network_list
     local total = #list
     if total == 0 then
-        -- Still process player logistics even with no networks
+        process_provider_chests()
         player_logistics.process()
         return
     end
@@ -156,7 +144,10 @@ function M.process()
         if network_name then
             local network = storage.networks[network_name]
             if network then
-                process_network(network_name, network, active_force)
+                -- Linked inventories are force-specific; the pool is shared globally.
+                for _, force in pairs(game.forces) do
+                    process_network(network_name, network, force)
+                end
             end
         end
 

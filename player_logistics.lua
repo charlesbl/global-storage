@@ -1,5 +1,6 @@
 local state = require("state")
 local network_module = require("network")
+local pool_items = require("pool_items")
 
 local M = {}
 
@@ -18,14 +19,23 @@ local function process_player(player)
     -- 1. Build requests map from personal logistics
     local requests = {} -- { item_name = { min, max } }
     local logistic_point = character.get_requester_point()
-    if logistic_point then
+    if logistic_point and logistic_point.enabled then
         for _, section in pairs(logistic_point.sections) do
-            for i = 1, section.filters_count do
-                local filter = section.get_slot(i)
-                if filter and filter.value then
-                    local item_name = filter.value.name or filter.value
-                    if type(item_name) == "string" then
-                        requests[item_name] = { min = filter.min or 0, max = filter.max }
+            if section.active and section.multiplier > 0 then
+                for i = 1, section.filters_count do
+                    local filter = section.get_slot(i)
+                    if filter and filter.value then
+                        local value = filter.value
+                        local item_name = type(value) == "table" and value.name or value
+                        local quality = type(value) == "table" and value.quality or "normal"
+                        if type(quality) ~= "string" and quality then quality = quality.name end
+                        if type(item_name) == "string" and pool_items.can_store({ name = item_name, quality = quality })
+                           and (type(value) ~= "table" or (value.type == nil or value.type == "item"))
+                           and (type(value) ~= "table" or value.comparator == nil or value.comparator == "=") then
+                            local request = requests[item_name] or { min = 0 }
+                            request.min = request.min + math.floor((filter.min or 0) * section.multiplier)
+                            requests[item_name] = request
+                        end
                     end
                 end
             end
@@ -38,9 +48,11 @@ local function process_player(player)
             local current = main_inv.get_item_count(item_name)
             if current < req.min then
                 local needed = req.min - current
-                local removed = network_module.remove_from_inventory(item_name, needed)
-                if removed > 0 then
-                    main_inv.insert({ name = item_name, count = removed })
+                local available = storage.inventory[item_name] or 0
+                local to_insert = math.min(needed, available)
+                if to_insert > 0 then
+                    local inserted = main_inv.insert({ name = item_name, quality = "normal", count = to_insert })
+                    network_module.remove_from_inventory(item_name, inserted)
                 end
             end
         end
@@ -51,9 +63,11 @@ local function process_player(player)
     if trash_inv then
         local contents = trash_inv.get_contents()
         for _, item in pairs(contents) do
-            local removed = trash_inv.remove({ name = item.name, count = item.count })
-            if removed > 0 then
-                storage.inventory[item.name] = (storage.inventory[item.name] or 0) + removed
+            if pool_items.can_store(item) then
+                local removed = trash_inv.remove({ name = item.name, quality = "normal", count = item.count })
+                if removed > 0 then
+                    storage.inventory[item.name] = (storage.inventory[item.name] or 0) + removed
+                end
             end
         end
     end

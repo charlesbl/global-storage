@@ -2,34 +2,48 @@ local constants = require("constants")
 local state = require("state")
 local network_module = require("network")
 local chest_gui = require("chest_gui")
+local craft_gui = require("craft_gui")
+local craft_requests = require("craft_requests")
 local network_gui = require("network_gui")
 local provider_gui = require("provider_gui")
+local chest_settings = require("chest_settings")
 
 local M = {}
 
--- Entity filters for our chests
-local chest_filter = {{ filter = "name", name = constants.GLOBAL_CHEST_ENTITY_NAME }}
-local provider_filter = {{ filter = "name", name = constants.GLOBAL_PROVIDER_CHEST_ENTITY_NAME }}
--- Combined filter for both chest types
+-- Construction and destruction events for all chest prototypes.
 local all_chests_filter = {
     { filter = "name", name = constants.GLOBAL_CHEST_ENTITY_NAME },
+    { filter = "name", name = constants.GLOBAL_CRAFT_CHEST_ENTITY_NAME },
     { filter = "name", name = constants.GLOBAL_PROVIDER_CHEST_ENTITY_NAME }
 }
 
 --- Handle any chest built (player or robot)
 ---@param event EventData
 local function on_any_chest_built(event)
-    local entity = event.entity or event.created_entity
+    local entity = event.destination or event.entity
     if not entity or not entity.valid then return end
 
+    state.migrate_network_types()
+    local saved = event.tags and event.tags[chest_settings.TAG]
+    if event.source and event.source.valid then
+        saved = chest_settings.capture(event.source) or saved
+    end
+
     -- Handle global-chest
-    if entity.name == constants.GLOBAL_CHEST_ENTITY_NAME then
+    if entity.name == constants.GLOBAL_CHEST_ENTITY_NAME or entity.name == constants.GLOBAL_CRAFT_CHEST_ENTITY_NAME then
+        if chest_settings.apply(entity, saved) then return end
         local link_id = entity.link_id
-        if link_id == 0 then
+        local current = storage.networks[state.get_network_name(link_id)]
+        if link_id == 0 or not current or current.entity_name ~= entity.name then
             -- Assign default network to new chests without explicit network ID
-            network_module.set_chest_network(entity, constants.DEFAULT_NETWORK_NAME)
+            local default_name = state.get_default_network(entity.name)
+            network_module.set_chest_network(entity, default_name)
         else
             network_module.on_chest_built(link_id, entity.unit_number)
+            if entity.name == constants.GLOBAL_CRAFT_CHEST_ENTITY_NAME and current.craft_recipe then
+                craft_requests.ensure(state.get_network_name(link_id), current)
+                craft_requests.update_inventory_bar(entity.get_inventory(defines.inventory.chest), current)
+            end
         end
         return
     end
@@ -37,6 +51,7 @@ local function on_any_chest_built(event)
     -- Handle global-provider-chest
     if entity.name == constants.GLOBAL_PROVIDER_CHEST_ENTITY_NAME then
         state.register_provider_chest(entity)
+        chest_settings.apply(entity, saved)
         return
     end
 end
@@ -48,7 +63,7 @@ local function on_any_chest_destroyed(event)
     if not entity or not entity.valid then return end
 
     -- Handle global-chest
-    if entity.name == constants.GLOBAL_CHEST_ENTITY_NAME then
+    if entity.name == constants.GLOBAL_CHEST_ENTITY_NAME or entity.name == constants.GLOBAL_CRAFT_CHEST_ENTITY_NAME then
         local link_id = entity.link_id
         if link_id and link_id ~= 0 then
             network_module.on_chest_destroyed(link_id)
@@ -64,82 +79,24 @@ local function on_any_chest_destroyed(event)
     end
 end
 
---- Handle copy-paste from assembling machine to chest
+--- Paste requests/network settings and refresh any open destination panels.
 ---@param event EventData.on_entity_settings_pasted
 local function on_entity_settings_pasted(event)
-    local source = event.source
+    if not chest_settings.paste(event.source, event.destination) then return end
     local destination = event.destination
-
-    if not destination or not destination.valid then return end
-    if destination.name ~= constants.GLOBAL_CHEST_ENTITY_NAME then return end
-
-    -- Paste from assembling machine: import recipe ingredients as requests
-    if source.type == "assembling-machine" or source.type == "furnace" then
-        local recipe = source.get_recipe()
-        if not recipe then return end
-
-        -- Build network name from recipe (e.g. "craft:iron-gear-wheel")
-        local network_name = constants.COPY_PASTE_NETWORK_PREFIX .. recipe.name
-
-        -- Check if network exists BEFORE creating it
-        local is_new_network = (storage.networks[network_name] == nil)
-
-        -- Update chest link_id to match recipe network
-        network_module.set_chest_network(destination, network_name)
-
-        -- Only set requests and block slots for NEW networks
-        if is_new_network then
-            local network = state.get_or_create_network(network_name)
-            if network then
-                -- Add ingredients as requests
-                local request_count = 0
-                for _, ingredient in pairs(recipe.ingredients) do
-                    if ingredient.type == "item" then
-                        local stack_size = prototypes.item[ingredient.name].stack_size
-                        network.requests[ingredient.name] = {
-                            min = stack_size,
-                            max = stack_size
-                        }
-                        request_count = request_count + 1
-                    end
-                end
-
-                -- Block slots: keep (request_count + 1) slots open for inputs + output
-                local inventory = destination.get_inventory(defines.inventory.chest)
-                if inventory and inventory.supports_bar() then
-                    inventory.set_bar(request_count + 2)  -- +1 for output, +1 for 1-indexing
-                end
-            end
+    for _, player in pairs(game.players) do
+        local pdata = state.get_player_data(player.index)
+        if pdata.opened_chest and pdata.opened_chest.valid
+           and pdata.opened_chest.unit_number == destination.unit_number then
+            chest_gui.update(player, destination)
         end
-
-        -- Refresh GUI if player has this chest open
-        local player = game.get_player(event.player_index)
-        if player then
-            local player_data = state.get_player_data(event.player_index)
-            if player_data.opened_chest and player_data.opened_chest.valid
-               and player_data.opened_chest.unit_number == destination.unit_number then
-                chest_gui.update(player, destination)
-            end
+        if pdata.opened_craft_chest and pdata.opened_craft_chest.valid
+           and pdata.opened_craft_chest.unit_number == destination.unit_number then
+            craft_gui.update(player, destination)
         end
-    end
-
-    -- Paste from another global chest: copy network ID
-    if source.name == constants.GLOBAL_CHEST_ENTITY_NAME then
-        local source_link_id = source.link_id
-        local source_network_name = state.get_network_name(source_link_id)
-
-        if source_network_name then
-            network_module.set_chest_network(destination, source_network_name)
-        end
-
-        -- Refresh GUI if player has this chest open
-        local player = game.get_player(event.player_index)
-        if player then
-            local player_data = state.get_player_data(event.player_index)
-            if player_data.opened_chest and player_data.opened_chest.valid
-               and player_data.opened_chest.unit_number == destination.unit_number then
-                chest_gui.update(player, destination)
-            end
+        if pdata.opened_provider_chest and pdata.opened_provider_chest.valid
+           and pdata.opened_provider_chest.unit_number == destination.unit_number then
+            provider_gui.update(player, destination)
         end
     end
 end
@@ -158,6 +115,14 @@ local function on_gui_opened(event)
     if not player then return end
 
     local player_data = state.get_player_data(event.player_index)
+    state.migrate_network_types()
+
+    if entity.name == constants.GLOBAL_CRAFT_CHEST_ENTITY_NAME then
+        player_data.opened_craft_chest = entity
+        craft_gui.create_relative_panel(player)
+        craft_gui.update(player, entity)
+        return
+    end
 
     -- Handle global-chest
     if entity.name == constants.GLOBAL_CHEST_ENTITY_NAME then
@@ -201,6 +166,13 @@ local function on_gui_closed(event)
     if event.gui_type == defines.gui_type.entity then
         local entity = event.entity
         if entity and entity.valid then
+            if entity.name == constants.GLOBAL_CRAFT_CHEST_ENTITY_NAME then
+                if not player.gui.screen.gn_craft_recipe_catalog then
+                    player_data.opened_craft_chest = nil
+                end
+                return
+            end
+
             -- Handle global-chest
             if entity.name == constants.GLOBAL_CHEST_ENTITY_NAME then
                 local popup = player.gui.screen[constants.GUI.CHEST_REQUEST_POPUP]
@@ -240,6 +212,11 @@ local function on_gui_closed(event)
         if ok and name then
             element_name = name
         end
+    end
+
+    if element_name == "gn_craft_recipe_catalog" then
+        craft_gui.close_recipe_catalog(player)
+        return
     end
 
     -- Close request popup - re-open the chest afterwards
@@ -340,6 +317,7 @@ local function on_player_created(event)
     local player = game.get_player(event.player_index)
     if player then
         chest_gui.create_relative_panel(player)
+        craft_gui.create_relative_panel(player)
         provider_gui.create_relative_panel(player)
         network_gui.restore_pin_hud(player)
     end
@@ -351,6 +329,7 @@ local function on_player_joined_game(event)
     local player = game.get_player(event.player_index)
     if player then
         chest_gui.create_relative_panel(player)
+        craft_gui.create_relative_panel(player)
         provider_gui.create_relative_panel(player)
         network_gui.restore_pin_hud(player)
     end
@@ -361,6 +340,7 @@ end
 function M.init_player_guis()
     for _, player in pairs(game.players) do
         chest_gui.create_relative_panel(player)
+        craft_gui.create_relative_panel(player)
         provider_gui.create_relative_panel(player)
         network_gui.restore_pin_hud(player)
     end
@@ -377,6 +357,9 @@ function M.refresh_open_guis()
         if pdata.opened_chest and pdata.opened_chest.valid then
             chest_gui.update_live(player)
         end
+        if pdata.opened_craft_chest and pdata.opened_craft_chest.valid then
+            craft_gui.update_live(player)
+        end
         if pdata.opened_provider_chest and pdata.opened_provider_chest.valid then
             provider_gui.update_live(player)
         end
@@ -391,6 +374,7 @@ function M.register()
     script.on_event(defines.events.on_built_entity, on_any_chest_built, all_chests_filter)
     script.on_event(defines.events.on_robot_built_entity, on_any_chest_built, all_chests_filter)
     script.on_event(defines.events.script_raised_built, on_any_chest_built, all_chests_filter)
+    script.on_event(defines.events.script_raised_revive, on_any_chest_built, all_chests_filter)
     script.on_event(defines.events.on_entity_cloned, on_any_chest_built, all_chests_filter)
 
     -- Chest destroyed events (both global-chest and global-provider-chest)
@@ -398,6 +382,8 @@ function M.register()
     script.on_event(defines.events.on_robot_mined_entity, on_any_chest_destroyed, all_chests_filter)
     script.on_event(defines.events.on_entity_died, on_any_chest_destroyed, all_chests_filter)
     script.on_event(defines.events.script_raised_destroy, on_any_chest_destroyed, all_chests_filter)
+
+    script.on_event(defines.events.on_player_setup_blueprint, chest_settings.on_player_setup_blueprint)
 
     -- Copy-paste
     script.on_event(defines.events.on_entity_settings_pasted, on_entity_settings_pasted)

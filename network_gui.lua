@@ -170,7 +170,8 @@ function M.build_networks_tab(parent, player)
     pdata.network_element_cache = {}
 
     -- Network rows
-    for network_name, network in pairs(storage.networks) do
+    for _, network_name in ipairs(state.get_sorted_network_names()) do
+        local network = storage.networks[network_name]
         local request_count = 0
         for _ in pairs(network.requests) do
             request_count = request_count + 1
@@ -187,6 +188,7 @@ function M.build_networks_tab(parent, player)
             tooltip = network_name
         })
         name_label.style.maximal_width = 250
+        name_label.style.rich_text_setting = defines.rich_text_setting.enabled
 
         -- Requests count
         local reqs_label = networks_table.add({
@@ -486,6 +488,7 @@ function M.open_inventory_edit_popup(player, item_name)
     local quantity = storage.inventory[item_name] or 0
     local limit = storage.limits[item_name]
     local is_unlimited = (limit == constants.UNLIMITED)
+    local draft_limit = is_unlimited and storage.previous_limits[item_name] or limit
     local pdata = state.get_player_data(player.index)
     local is_pinned = pdata.pinned_items[item_name] or false
 
@@ -543,7 +546,7 @@ function M.open_inventory_edit_popup(player, item_name)
     local limit_field = limit_flow.add({
         type = "textfield",
         name = GUI.INVENTORY_EDIT_LIMIT_FIELD,
-        text = (limit and limit > 0) and tostring(limit) or "",
+        text = (draft_limit and draft_limit > 0) and tostring(draft_limit) or "",
         numeric = true,
         allow_decimal = false,
         allow_negative = false,
@@ -606,6 +609,38 @@ function M.open_inventory_edit_popup(player, item_name)
     pdata.opening_inventory_popup = true
 
     player.opened = popup
+end
+
+--- Apply the popup's draft only on OK/Enter, then return to the inventory.
+function M.confirm_inventory_edit_popup(player)
+    local popup = player.gui.screen[GUI.INVENTORY_EDIT_POPUP]
+    if not popup or not popup.valid then return end
+    local item_name = popup.tags.item_name
+    local field = M.find_element(popup, GUI.INVENTORY_EDIT_LIMIT_FIELD)
+    local unlimited = M.find_element(popup, GUI.INVENTORY_EDIT_UNLIMITED_CB)
+    local pin = M.find_element(popup, GUI.INVENTORY_EDIT_PIN_CB)
+    if not item_name or not field or not unlimited or not pin then return end
+
+    local value = tonumber(field.text)
+    if value and value > 0 then
+        storage.previous_limits[item_name] = value
+    end
+    network_module.set_limit(item_name, unlimited.state and constants.UNLIMITED or value)
+
+    local pdata = state.get_player_data(player.index)
+    if pin.state then
+        pdata.pinned_items[item_name] = true
+        M.add_item_to_hud(player, item_name)
+    else
+        pdata.pinned_items[item_name] = nil
+        M.remove_item_from_hud(player, item_name)
+    end
+    M.destroy_inventory_edit_popup(player)
+    M.rebuild_inventory_tab(player)
+    if pdata.opened_network_gui then
+        local frame = player.gui.screen[GUI.NETWORK_FRAME]
+        if frame then player.opened = frame end
+    end
 end
 
 --- Destroy the inventory edit popup
@@ -1140,7 +1175,10 @@ end
 ---@param player LuaPlayer
 ---@param network_name string
 function M.do_delete_network(player, network_name)
-    state.delete_network(network_name, player.force)
+    if not state.delete_network(network_name) then
+        player.print({ "gui.network-delete-unsupported-items" })
+        return
+    end
 
     -- Remove row elements from table
     local frame = player.gui.screen[GUI.NETWORK_FRAME]
@@ -1322,17 +1360,7 @@ function M.on_gui_click(event)
 
     -- Confirm edit popup
     if element.name == GUI.INVENTORY_EDIT_CONFIRM then
-        M.destroy_inventory_edit_popup(player)
-        -- Rebuild inventory grid to show changes
-        M.rebuild_inventory_tab(player)
-        -- Reopen network GUI
-        local pdata = state.get_player_data(player.index)
-        if pdata.opened_network_gui then
-            local frame = player.gui.screen[GUI.NETWORK_FRAME]
-            if frame then
-                player.opened = frame
-            end
-        end
+        M.confirm_inventory_edit_popup(player)
         return
     end
 
@@ -1340,9 +1368,12 @@ function M.on_gui_click(event)
     if element.name == GUI.NETWORK_DELETE_CONFIRM_YES then
         if tags and tags.network_name then
             local network_name = tags.network_name
-            -- Reassign chests to default network
-            state.reassign_network_chests(network_name, nil)
-            -- Delete the network
+            if not state.can_delete_network(network_name) then
+                player.print({ "gui.network-delete-unsupported-items" })
+                M.destroy_delete_confirm_popup(player)
+                return
+            end
+            -- Delete drains inventories and reassigns chests before removing state.
             M.do_delete_network(player, network_name)
         end
         M.destroy_delete_confirm_popup(player)
@@ -1385,15 +1416,8 @@ function M.on_gui_text_changed(event)
     if not element or not element.valid then return end
     if not element.name then return end
 
-    -- Popup limit field
-    if element.name == GUI.INVENTORY_EDIT_LIMIT_FIELD then
-        local tags = element.tags
-        if tags and tags.item_name then
-            local value = tonumber(element.text)
-            network_module.set_limit(tags.item_name, value)
-        end
-        return
-    end
+    -- The textfield itself holds the draft; typing must not change storage.
+    if element.name == GUI.INVENTORY_EDIT_LIMIT_FIELD then return end
 
     -- Legacy: old inventory limit field
     if element.name:find(GUI.INVENTORY_LIMIT_FIELD) then
@@ -1455,58 +1479,16 @@ function M.on_gui_checked_state_changed(event)
         return
     end
 
-    -- Popup unlimited checkbox
+    -- Keep the numeric draft when toggling unlimited; commit on OK/Enter only.
     if element.name == GUI.INVENTORY_EDIT_UNLIMITED_CB then
-        if not tags or not tags.item_name then return end
-        local item_name = tags.item_name
-        local current_limit = storage.limits[item_name]
-
-        -- Ensure previous_limits table exists
-        storage.previous_limits = storage.previous_limits or {}
-
-        -- Find the limit field in the popup
         local popup = player.gui.screen[GUI.INVENTORY_EDIT_POPUP]
         local limit_field = popup and M.find_element(popup, GUI.INVENTORY_EDIT_LIMIT_FIELD)
-
-        if element.state then
-            -- Checked: save current limit and set unlimited
-            if current_limit and current_limit > 0 then
-                storage.previous_limits[item_name] = current_limit
-            end
-            network_module.set_limit(item_name, constants.UNLIMITED)
-            if limit_field and limit_field.valid then
-                limit_field.enabled = false
-                limit_field.text = ""
-            end
-        else
-            -- Unchecked: restore previous limit or block
-            local previous = storage.previous_limits[item_name]
-            network_module.set_limit(item_name, previous)
-            if limit_field and limit_field.valid then
-                limit_field.enabled = true
-                limit_field.text = previous and tostring(previous) or ""
-            end
-        end
+        if limit_field then limit_field.enabled = not element.state end
         return
     end
 
-    -- Popup pin checkbox
-    if element.name == GUI.INVENTORY_EDIT_PIN_CB then
-        if not tags or not tags.item_name then return end
-        local item_name = tags.item_name
-        local pdata = state.get_player_data(player.index)
-
-        if element.state then
-            -- Pin item to HUD
-            pdata.pinned_items[item_name] = true
-            M.add_item_to_hud(player, item_name)
-        else
-            -- Unpin item from HUD
-            pdata.pinned_items[item_name] = nil
-            M.remove_item_from_hud(player, item_name)
-        end
-        return
-    end
+    -- Pin edits belong to the same draft and are applied by confirmation.
+    if element.name == GUI.INVENTORY_EDIT_PIN_CB then return end
 
     -- Legacy: old inventory unlimited checkbox (for compatibility during transition)
     if element.name and element.name:find(GUI.INVENTORY_UNLIMITED_CHECKBOX) then
@@ -1550,19 +1532,9 @@ function M.on_gui_confirmed(event)
     local player = game.get_player(event.player_index)
     if not player then return end
 
-    -- Enter pressed in popup limit field - close popup
+    -- Enter uses exactly the same commit path as the OK button.
     if element.name == GUI.INVENTORY_EDIT_LIMIT_FIELD then
-        M.destroy_inventory_edit_popup(player)
-        -- Rebuild inventory grid to show changes
-        M.rebuild_inventory_tab(player)
-        -- Reopen network GUI
-        local pdata = state.get_player_data(player.index)
-        if pdata.opened_network_gui then
-            local frame = player.gui.screen[GUI.NETWORK_FRAME]
-            if frame then
-                player.opened = frame
-            end
-        end
+        M.confirm_inventory_edit_popup(player)
     end
 end
 
@@ -1604,6 +1576,25 @@ function M.update_live(player)
             end
         end
     elseif selected_tab == 1 then
+        -- New or removed networks must also appear in alphabetical order while open.
+        local cache = pdata.network_element_cache or {}
+        local changed = false
+        for name in pairs(storage.networks) do
+            if not cache[name] then changed = true; break end
+        end
+        if not changed then
+            for name in pairs(cache) do
+                if not storage.networks[name] then changed = true; break end
+            end
+        end
+        if changed then
+            local scroll = M.find_element(frame, GUI.NETWORKS_SCROLL)
+            if scroll then
+                local parent = scroll.parent
+                parent.clear()
+                M.build_networks_tab(parent, player)
+            end
+        end
         -- Update network tab using cached references
         local cache = pdata.network_element_cache
         if cache then

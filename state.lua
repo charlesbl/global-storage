@@ -1,6 +1,27 @@
 local constants = require("constants")
+local pool_items = require("pool_items")
 
 local M = {}
+
+--- Alphabetical order for both network GUIs, ignoring ASCII letter case.
+function M.get_sorted_network_names(manual_only)
+    local names = {}
+    for name, network in pairs(storage.networks or {}) do
+        if not manual_only or (network.manual and (network.entity_name or constants.GLOBAL_CHEST_ENTITY_NAME) == constants.GLOBAL_CHEST_ENTITY_NAME) then names[#names + 1] = name end
+    end
+    local function sort_key(name)
+        local text = name:gsub("%[item=[^%]]+%]", ""):gsub("%[fluid=[^%]]+%]", "")
+                         :gsub("%[img=[^%]]+%]", "")
+        text = text:match("^%s*(.-)%s*$")
+        return string.lower(text ~= "" and text or name)
+    end
+    table.sort(names, function(a, b)
+        local lower_a, lower_b = sort_key(a), sort_key(b)
+        if lower_a == lower_b then return a < b end
+        return lower_a < lower_b
+    end)
+    return names
+end
 
 --- Allocate a new unique link_id using a sequential counter
 ---@return number link_id
@@ -10,9 +31,35 @@ function M.allocate_link_id()
     return id
 end
 
+--- Preserve old chests/inventories as manual networks when introducing the craft prototype.
+function M.migrate_network_types()
+    if storage.chest_type_schema == 1 then return end
+    storage.recipe_networks = storage.recipe_networks or {}
+    for _, network in pairs(storage.networks or {}) do
+        network.entity_name = network.entity_name or constants.GLOBAL_CHEST_ENTITY_NAME
+        if network.entity_name == constants.GLOBAL_CHEST_ENTITY_NAME and network.craft_recipe then
+            network.legacy_recipe = network.craft_recipe
+            network.manual = true
+            network.craft_recipe, network.craft_multiplier, network.craft_output_slots = nil, nil, nil
+            network.craft_slot_layout_version = nil
+            for _, force in pairs(game.forces) do
+                local inventory = force.get_linked_inventory(network.entity_name or constants.GLOBAL_CHEST_ENTITY_NAME, network.link_id)
+                if inventory then
+                    if inventory.supports_filters() then
+                        for index = 1, #inventory do inventory.set_filter(index, nil) end
+                    end
+                    if inventory.supports_bar() then inventory.set_bar(#inventory + 1) end
+                end
+            end
+        end
+    end
+    storage.chest_type_schema = 1
+end
+
 --- Initialize storage structure for new game
 function M.init()
     storage.networks = storage.networks or {}
+    M.migrate_network_types()
     storage.inventory = storage.inventory or {}
     storage.limits = storage.limits or {}
     storage.previous_limits = storage.previous_limits or {}  -- Remembers last numeric limit when switching to unlimited
@@ -54,7 +101,7 @@ function M.recalculate_chest_counts()
     -- Scan all surfaces for chests
     for _, surface in pairs(game.surfaces) do
         local chests = surface.find_entities_filtered({
-            name = constants.GLOBAL_CHEST_ENTITY_NAME
+            name = { constants.GLOBAL_CHEST_ENTITY_NAME, constants.GLOBAL_CRAFT_CHEST_ENTITY_NAME }
         })
 
         for _, chest in pairs(chests) do
@@ -78,7 +125,9 @@ end
 ---@param name string Network name
 ---@param manual boolean|nil If true, marks network as manually created (shown in list)
 ---@return table network Network data
-function M.get_or_create_network(name, manual)
+function M.get_or_create_network(name, manual, entity_name)
+    M.migrate_network_types()
+    entity_name = entity_name or constants.GLOBAL_CHEST_ENTITY_NAME
     if not name or name == "" then
         return nil
     end
@@ -89,18 +138,34 @@ function M.get_or_create_network(name, manual)
             chest_count = 0,
             requests = {},
             manual = manual or false,
-            link_id = link_id
+            link_id = link_id,
+            entity_name = entity_name
         }
         -- Store reverse mapping
         storage.link_id_to_network[link_id] = name
         -- Invalidate network list for round-robin rebuild
         storage.network_list = nil
+    elseif storage.networks[name].entity_name ~= entity_name then
+        return nil
     elseif manual then
         -- If manually accessed, mark as manual
         storage.networks[name].manual = true
     end
 
     return storage.networks[name]
+end
+
+--- Pick a default of the correct chest type without colliding with user network IDs.
+function M.get_default_network(entity_name)
+    M.migrate_network_types()
+    local base = entity_name == constants.GLOBAL_CRAFT_CHEST_ENTITY_NAME
+        and constants.DEFAULT_CRAFT_NETWORK_NAME or constants.DEFAULT_NETWORK_NAME
+    local name, suffix = base, 1
+    while storage.networks[name] and storage.networks[name].entity_name ~= entity_name do
+        suffix = suffix + 1
+        name = base .. " #" .. suffix
+    end
+    return name, M.get_or_create_network(name, false, entity_name)
 end
 
 --- Get network name from link_id
@@ -133,35 +198,50 @@ function M.remove_chest_tracking(unit_number)
     storage.chest_networks[unit_number] = nil
 end
 
---- Delete a network and transfer its items to global pool
----@param name string Network name
----@param force LuaForce Force to access linked inventory
-function M.delete_network(name, force)
+--- Reject deletion while the linked inventory contains stacks the pool cannot preserve.
+function M.can_delete_network(name)
     local network = storage.networks[name]
-    if not network then return end
+    if not network then return true end
+    for _, force in pairs(game.forces) do
+        local inventory = force.get_linked_inventory(network.entity_name or constants.GLOBAL_CHEST_ENTITY_NAME, network.link_id)
+        if inventory then
+            for _, item in pairs(inventory.get_contents()) do
+                if not pool_items.can_store(item) then return false end
+            end
+        end
+    end
+    return true
+end
+
+--- Delete a network and transfer its items to global pool across all forces.
+---@param name string Network name
+function M.delete_network(name)
+    local network = storage.networks[name]
+    if not network then return true end
+    if not M.can_delete_network(name) then return false end
 
     -- Transfer items from linked inventory to global pool
     local link_id = network.link_id
-    local linked_inv = force.get_linked_inventory(constants.GLOBAL_CHEST_ENTITY_NAME, link_id)
-
-    if linked_inv then
-        local contents = linked_inv.get_contents()
-        for _, item in pairs(contents) do
-            local item_name = item.name
-            local count = item.count
-            local current = storage.inventory[item_name] or 0
-
-            -- Bypass limits on deletion: priority = never lose items
-            storage.inventory[item_name] = current + count
-            linked_inv.remove({ name = item_name, count = count })
+    for _, inventory_force in pairs(game.forces) do
+        local linked_inv = inventory_force.get_linked_inventory(network.entity_name or constants.GLOBAL_CHEST_ENTITY_NAME, link_id)
+        if linked_inv then
+            for _, item in pairs(linked_inv.get_contents()) do
+                local removed = linked_inv.remove({ name = item.name, quality = "normal", count = item.count })
+                -- Bypass limits, but only credit items actually removed.
+                storage.inventory[item.name] = (storage.inventory[item.name] or 0) + removed
+            end
         end
     end
+
+    -- Drain inventories before detaching the last chest, then keep chests registered.
+    M.reassign_network_chests(name, nil)
 
     -- Remove network
     storage.networks[name] = nil
     storage.link_id_to_network[link_id] = nil
     -- Invalidate network list for round-robin rebuild
     storage.network_list = nil
+    return true
 end
 
 --- Get player data (create if needed)
@@ -171,6 +251,7 @@ function M.get_player_data(player_index)
     if not storage.player_data[player_index] then
         storage.player_data[player_index] = {
             opened_chest = nil,  -- LuaEntity (global-chest)
+            opened_craft_chest = nil,  -- LuaEntity (global-craft-chest)
             opened_provider_chest = nil,  -- LuaEntity (global-provider-chest)
             opened_network_gui = false,
             pinned_items = {},  -- { ["iron-plate"] = true }
@@ -214,8 +295,17 @@ function M.reassign_network_chests(old_network_name, new_network_name)
     if not old_network then return 0 end
     local old_link_id = old_network.link_id
 
-    local target_network_name = new_network_name or constants.DEFAULT_NETWORK_NAME
-    local target_net = M.get_or_create_network(target_network_name)
+    local target_network_name = new_network_name or M.get_default_network(old_network.entity_name)
+    if target_network_name == old_network_name then
+        local base = target_network_name .. "-replacement"
+        local suffix = 1
+        target_network_name = base
+        while storage.networks[target_network_name] and storage.networks[target_network_name].entity_name ~= old_network.entity_name do
+            suffix = suffix + 1
+            target_network_name = base .. " #" .. suffix
+        end
+    end
+    local target_net = M.get_or_create_network(target_network_name, false, old_network.entity_name)
     if not target_net then return 0 end
     local new_link_id = target_net.link_id
 
@@ -224,7 +314,7 @@ function M.reassign_network_chests(old_network_name, new_network_name)
     -- Scan all surfaces for chests with the old link_id
     for _, surface in pairs(game.surfaces) do
         local chests = surface.find_entities_filtered({
-            name = constants.GLOBAL_CHEST_ENTITY_NAME
+            name = old_network.entity_name or constants.GLOBAL_CHEST_ENTITY_NAME
         })
 
         for _, chest in pairs(chests) do

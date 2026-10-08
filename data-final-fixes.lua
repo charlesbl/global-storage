@@ -1,36 +1,31 @@
 local constants = require("constants")
 
--- Add global chest as pastable target for all assembling machines
--- This allows copy-paste from assemblers to auto-configure the chest
-local function add_global_chest_as_pastable_target()
-    local chest_proto = data.raw["linked-container"][constants.GLOBAL_CHEST_ENTITY_NAME]
-    if not chest_proto then return end
-
-    local chest_paste_targets = chest_proto.additional_pastable_entities or {}
-
-    for _, assembler in pairs(data.raw["assembling-machine"]) do
-        -- Add chest as pastable target for assembler
-        local entities = assembler.additional_pastable_entities or {}
-        table.insert(entities, constants.GLOBAL_CHEST_ENTITY_NAME)
-        assembler.additional_pastable_entities = entities
-
-        -- Add assembler as pastable target for chest
-        table.insert(chest_paste_targets, assembler.name)
+-- Allow recipe settings copy/paste to the craft and provider chests.
+-- Explicit self-targets also enable copy/paste between built chests of the same type.
+local function add_target(prototype, name)
+    local targets = prototype.additional_pastable_entities or {}
+    for _, target in pairs(targets) do
+        if target == name then return end
     end
-
-    -- Also add furnaces
-    for _, furnace in pairs(data.raw["furnace"]) do
-        local entities = furnace.additional_pastable_entities or {}
-        table.insert(entities, constants.GLOBAL_CHEST_ENTITY_NAME)
-        furnace.additional_pastable_entities = entities
-
-        table.insert(chest_paste_targets, furnace.name)
-    end
-
-    chest_proto.additional_pastable_entities = chest_paste_targets
+    targets[#targets + 1] = name
+    prototype.additional_pastable_entities = targets
 end
 
-add_global_chest_as_pastable_target()
+add_target(data.raw["linked-container"][constants.GLOBAL_CHEST_ENTITY_NAME], constants.GLOBAL_CHEST_ENTITY_NAME)
+
+local chests = {
+    data.raw["linked-container"][constants.GLOBAL_CRAFT_CHEST_ENTITY_NAME],
+    data.raw["logistic-container"][constants.GLOBAL_PROVIDER_CHEST_ENTITY_NAME]
+}
+for _, chest in ipairs(chests) do
+    add_target(chest, chest.name)
+    for _, category in ipairs({ "assembling-machine", "furnace" }) do
+        for _, machine in pairs(data.raw[category] or {}) do
+            add_target(machine, chest.name)
+            add_target(chest, machine.name)
+        end
+    end
+end
 
 -- Add global provider chest unlock to construction-robotics technology
 if data.raw["technology"]["construction-robotics"] then

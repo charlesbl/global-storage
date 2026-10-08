@@ -14,6 +14,14 @@ Global Network provides a **shared global inventory** that all your chests can a
 
 ## Chests
 
+All three chests use the craft chest's industrial body, frame and latch, with
+custom skins and matching inventory icons:
+green with a network symbol for storage, blue with a gear for crafting, and
+orange with a logistic robot for the provider. Entity sprites are 64 × 64 pixels
+and inventory icons are 32 × 32 pixels; the entity canvas occupies one tile.
+The provider uses a static
+closed-lid sprite when opened; its logistics behaviour is unchanged.
+
 ### Global Chest
 
 A linked container that shares its inventory with all other Global Chests on the same network.
@@ -25,6 +33,23 @@ A linked container that shares its inventory with all other Global Chests on the
 **How it works:**
 - Items **above max** are collected into the global pool
 - Items **below min** are supplied from the global pool
+
+### Global Craft Chest
+
+A separate linked chest with a dedicated recipe interface. Choose a recipe directly
+with the native recipe selector, or open **All recipes** for a paginated catalogue
+of every recipe prototype, including hidden, locked and modded recipes. The
+catalogue searches internal recipe names, shown in tooltips. Settings can also be
+pasted from assembling machines and furnaces.
+
+All craft chests selecting the same recipe share a recipe network, its inventory,
+multiplier and output reservation. These inventories are separate from normal
+Global Chest networks. A new recipe network defaults to ten crafts (×10).
+
+Existing Global Chests remain normal chests: their inventories and requests are
+preserved, including former craft networks, which become editable manual networks.
+Their former automatic slot filters are cleared. Place the new Global Craft Chest
+to use the dedicated recipe controls.
 
 ### Global Provider Chest
 
@@ -51,6 +76,9 @@ Every item has a storage limit that controls how much can be stored globally:
 | **Unlimited** | No limit on storage |
 
 New items appear with a limit of 0 (blocked) until you configure them. This prevents unwanted items from flooding your storage.
+
+In the item edit popup, limit, unlimited and HUD pin changes stay in draft until
+you click **OK** or press **Enter**. Closing the popup discards the draft.
 
 ---
 
@@ -79,13 +107,84 @@ Press **Shift+G** to open the management interface with three tabs:
 
 ### Copy-Paste from Assemblers
 
-Copy settings from an assembling machine or furnace and paste onto a Global Chest:
+Copy settings from an assembling machine or furnace and paste onto a **Global
+Craft Chest** to select its recipe and join that recipe's shared network. You can
+also select the recipe directly in the chest interface. Provider chests keep their
+one-stack-per-ingredient recipe import.
 
-1. The chest joins a network named after the recipe (e.g., "iron-gear-wheel")
-2. Recipe ingredients are automatically added as requests with stack-size quantities
-3. Inventory slots are limited to inputs + output
+### Craft Network Multiplier
 
-This makes setting up production lines extremely fast.
+Global Craft Chests show their recipe controls and shared multiplier once a recipe
+is selected. Without a recipe, only recipe selection is shown. At **×1**,
+each item request equals its ingredient quantity in one craft; **×2** requests
+twice that quantity, and so on. Both request minimum and maximum use that amount.
+The slider runs linearly from **×10 to ×500** in steps of 10. Type any positive integer in the field and click **Apply** or
+press **Enter**, including ×1 or values above ×500. The field always displays
+the actual factor; the slider shows the closest available step. New networks
+default to ×10. Networks still using the old ×1 default are adjusted once to ×10;
+other existing factors and explicit blueprint factors are preserved.
+
+Changing the factor recalculates the network's ingredient request list and expands
+its inventory bar for the necessary stacks, subject to the chest's slot capacity.
+The setting is shared by all chests on the network and preserved by copy/paste and
+blueprints. Existing `craft:` networks adopt exact ingredient quantities at ×1.
+Fluids cannot be stored in chests and are not included. Normal chests have their
+own manual-request interface; provider chests keep their existing request behavior.
+
+Craft requests are read-only and controlled by the multiplier. A second slider
+selects the shared number of slots reserved for outputs. Each distinct item output
+gets at least one slot by default, including probabilistic outputs; repeated products
+of the same item share a filter. The slider cannot go below this minimum. Additional
+slots are shared evenly, with the remainder assigned in alphabetical item order.
+Fluid-only recipes need no item output slot. Existing networks and blueprints with
+too few reserved slots are adjusted automatically.
+Input slots and output slots are filtered by item. The summary displays each
+item's icon, requested input quantity or reserved output capacity, and slot count
+in compact input and output grids without individual frames. Hover an item for
+its full name and exact quantities. Large recipes use 16-item pages instead of
+a nested scroll pane.
+It warns if planned inputs plus reserved outputs exceed the chest capacity or
+an output has no slot. Available slots are limited by the inventory size, with
+output space reserved before allocating the remaining capacity to inputs.
+Existing items are not removed when changing filters. Blueprints preserve this setting.
+
+### Resource Icons in Network IDs
+
+Open a linked chest, click **Edit**, then use the single icon button beside the
+ID field. It opens Factorio's native signal selector, with item, fluid, virtual
+signal and other available signal icons. Each selection appends an icon to the
+ID; click **Validate** to apply it. Multiple icons and text can be combined,
+for example `Iron [img=item/iron-ore]` or `Oil [img=fluid/crude-oil]`.
+You can also type or remove these tags directly.
+
+The exact text, including icon tags, is the network ID. Adding an icon to an
+existing ID selects or creates a different network, like any other ID edit.
+Copy/paste and blueprints preserve the icons. Network lists sort by the text
+outside icon tags; icon-only IDs use the full ID as their sort key.
+
+### Copy/Paste and Blueprints
+
+Use **Shift+right-click** on a configured chest to copy its settings, then
+**Shift+left-click** on another chest of the same type to paste them. Provider
+chests copy their complete item request list, replacing the destination requests.
+Linked chests join the source network. Linked chests request the exact recipe ingredients × a multiplier; provider
+chests keep their one-stack-per-ingredient recipe import.
+
+**Ctrl+C**, **Ctrl+X** and blueprints retain provider requests and linked chest
+network names, requests and inventory bars, plus craft chest recipes, multipliers
+and output reservations. Settings are restored when a player,
+construction robot or script builds the chest. Blueprint library records and
+copying tagged ghosts are supported. Items inside chests and the global pool are
+not included in blueprints.
+
+When placing a linked chest blueprint, an existing network of the same name keeps
+its current requests and shared inventory bar. A missing network is recreated
+from the blueprint. This prevents pasting an old blueprint from overwriting a
+live network's configuration. Craft blueprints similarly keep an existing recipe
+network's live settings; missing recipe networks are recreated from the blueprint.
+
+The network management table and the chest's manual-network chooser are sorted
+alphabetically, ignoring ASCII letter case.
 
 ### Player Logistics Integration
 
@@ -156,9 +255,51 @@ Items above 1000 are collected to global storage. When any chest drops below 100
 
 ## Compatibility
 
-- **Factorio Version**: 2.0+
+- **Factorio Version**: 2.0.77 or newer in the 2.0 series
 - **Multiplayer**: Supported
 - **Safe to add mid-game**: Yes
+
+The global quantity pool accepts ordinary items, modules and capsules of **normal quality**.
+Higher-quality items, perishable items, ammo, tools, blueprints, armor and other items
+with stack-specific data remain in physical linked inventories or player trash slots.
+They are never converted to normal items by the pool. Empty those items before deleting
+a network. Personal logistics supplies normal-quality requests from active sections and
+respects the personal logistics switch and section multipliers.
+
+Linked inventories are separate per force, as in Factorio; the global quantity pool and
+network request configuration are shared by all forces.
+
+## Build the Mod Portal artifact
+
+Requires Python 3.9 or newer; no additional Python packages are needed.
+From the repository directory, run:
+
+```powershell
+python scripts/build_mod.py
+```
+
+The script reads the name and version from `info.json` and creates
+`dist/global-storage_0.1.4.zip`, containing a single `global-storage_0.1.4/` directory.
+It validates the metadata and ZIP integrity and includes runtime files, locale,
+thumbnail, README and changelog. Git files, `.claude`, development scripts and generated
+artifacts are excluded. Identical inputs produce identical archives.
+
+To select another destination:
+
+```powershell
+python scripts/build_mod.py --output-dir E:/mod-releases
+```
+
+Upload the generated ZIP to the Mod Portal. To test locally, use this checkout in
+`mods/global-storage/` or put the ZIP directly in `mods/`, then enable Global Storage
+in Factorio's Mods menu. Use only one copy of this version at a time.
+
+Validation for this update was limited to static Lua compilation, checks against
+the bundled Factorio 2.0.77 API/prototypes and ZIP inspection. Factorio was not launched.
+In-game validation remains to be done: crafting and opening both chests, recipe
+copy/paste with a small inventory, provider requests without a linked network,
+personal requests with a full inventory and inactive sections, quality/spoilage
+preservation, network deletion, and loading an existing save.
 
 ---
 
@@ -166,5 +307,5 @@ Items above 1000 are collected to global storage. When any chest drops below 100
 
 - Processing runs every 10 ticks with round-robin distribution
 - Uses Factorio's native linked-container system for shared inventories
-- Network ID is hashed to link_id for the linked container system
+- Network IDs receive sequential unique link IDs for the linked container system
 - Ghost networks (no chests) retain their configuration for later use

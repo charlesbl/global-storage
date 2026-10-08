@@ -1,0 +1,35 @@
+---------------------------------------------------------------------------------------------------
+Version: 0.1.4
+Date: 2026-10-08
+  Features:
+    - Add a dedicated Global Craft Chest with recipe networks and inventories separate from normal Global Chests.
+    - Select recipes directly or browse a searchable, paginated catalogue including hidden, locked and modded recipes.
+    - Share exact recipe ingredient requests, craft multipliers and output slot reservations across each craft network.
+    - Default new recipe networks to x10; provide an x10-x500 slider and an Apply/Enter field for any positive integer multiplier.
+    - Filter ingredient and output slots, reserve at least one slot per distinct solid output, and include probabilistic products.
+    - Show compact item/quantity/slot grids, paginate sections exceeding 16 items, and warn when chest capacity is exceeded.
+    - Give all three chests matching industrial bodies and icons: green network storage, blue craft gear and orange logistic robot.
+    - Use 64-pixel entity sprites and 32-pixel icons; the provider has a static closed-lid sprite.
+    - Add a native signal selector to network IDs and display resource icons in network names.
+    - Sort network lists alphabetically, ignoring case and resource icon tags.
+    - Copy/paste provider requests and chest settings with vanilla Shift mouse shortcuts; accept recipes from assemblers and furnaces.
+    - Preserve network settings, provider requests, craft multipliers and output reservations through copy/cut, blueprints and library records.
+    - Restore chest settings when built or revived by players, robots or scripts, and when cloned.
+    - Add French translations for craft controls, slot summaries and network icon controls.
+  Bugfixes:
+    - Fix the craft chest GUI crash caused by applying summary spacing to a frame.
+    - Hide craft controls while no recipe is selected and make recipe ingredient requests read-only.
+    - Apply pool limits, unlimited storage and HUD pin edits only on OK or Enter; closing the popup discards pending edits.
+    - Refresh network lists when networks are added or removed while the GUI is open.
+    - Honor enabled personal logistics, active sections, section multipliers and repeated requests.
+    - Deduct only items successfully inserted into the player's inventory.
+    - Process provider chests even when no linked networks exist.
+    - Protect unsupported stacks during network deletion and safely reassign chests when deleting default networks.
+    - Keep craft inventory bars within chest capacity and enforce the minimum output reservation on sliders and imported settings.
+  Compatibility:
+    - Require Factorio 2.0.77 or newer in the 2.0 series; make Global Chest entities/items visible and their GUI accessible to all players.
+    - Keep higher-quality, perishable and individually tracked item stacks out of the quantity-only pool.
+    - Preserve existing normal chest inventories and requests; migrate former craft networks to manual settings.
+    - Upgrade old x1 craft defaults to x10 once, preserving custom multipliers and blueprint settings.
+  Changes:
+    - Add a reproducible Mod Portal ZIP builder, document the new controls and replace CLAUDE.md with AGENTS.md.

@@ -1,11 +1,11 @@
 {
   "name": "global-storage",
-  "version": "0.1.3",
+  "version": "0.1.4",
   "title": "Global Storage",
   "author": "charlesbl",
   "factorio_version": "2.0",
   "dependencies": [
-    "base >= 2.0"
+    "base >= 2.0.77"
   ],
-  "description": "Adds a global storage network using linked chests. Set network IDs to share inventory between chests. Copy-paste from assemblers to auto-configure."
+  "description": "Adds a global storage network using linked chests. Set network IDs to share inventory between chests. Use dedicated craft chests to select recipes and configure ingredient quantities and output slots."
 }
