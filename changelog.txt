@@ -2,6 +2,9 @@
 Version: 0.1.4
 Date: 2026-10-08
   Features:
+    - Search the global inventory by translated or internal item name, ignoring case and accents, with a clear button and no-results message.
+    - Sort manual and automatic HUD pins by name, stock quantity or fill ratio in either direction; remember the choice per player.
+    - Display craft network names as craft: followed by the recipe icon, while preserving their persistent IDs and blueprint settings.
     - Add a dedicated Global Craft Chest with recipe networks and inventories separate from normal Global Chests.
     - Select recipes directly or browse a searchable, paginated catalogue including hidden, locked and modded recipes.
     - Share exact recipe ingredient requests, craft multipliers and output slot reservations across each craft network.

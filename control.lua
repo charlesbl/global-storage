@@ -68,6 +68,10 @@ script.on_event(defines.events.on_gui_checked_state_changed, function(event)
     network_gui.on_gui_checked_state_changed(event)
 end)
 
+script.on_event(defines.events.on_gui_selection_state_changed, network_gui.on_gui_selection_state_changed)
+script.on_event(defines.events.on_string_translated, network_gui.on_string_translated)
+script.on_event(defines.events.on_player_locale_changed, network_gui.on_player_locale_changed)
+
 script.on_event(defines.events.on_gui_confirmed, function(event)
     chest_gui.on_gui_confirmed(event)
     craft_gui.on_gui_confirmed(event)

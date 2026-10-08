@@ -328,6 +328,7 @@ end
 local function on_player_joined_game(event)
     local player = game.get_player(event.player_index)
     if player then
+        network_gui.on_player_locale_changed(event)
         chest_gui.create_relative_panel(player)
         craft_gui.create_relative_panel(player)
         provider_gui.create_relative_panel(player)
@@ -339,6 +340,7 @@ end
 --- Called from control.lua on_init and on_configuration_changed
 function M.init_player_guis()
     for _, player in pairs(game.players) do
+        network_gui.on_player_locale_changed({ player_index = player.index })
         chest_gui.create_relative_panel(player)
         craft_gui.create_relative_panel(player)
         provider_gui.create_relative_panel(player)

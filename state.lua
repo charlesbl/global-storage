@@ -3,6 +3,18 @@ local pool_items = require("pool_items")
 
 local M = {}
 
+-- Display recipe icons without changing persistent network IDs or blueprint tags.
+function M.network_caption(name)
+    local network = storage.networks and storage.networks[name]
+    local recipe = network and network.entity_name == constants.GLOBAL_CRAFT_CHEST_ENTITY_NAME
+        and network.craft_recipe
+    if recipe and prototypes.recipe[recipe] then
+        local suffix = name:match("( #%d+)$") or ""
+        return "craft: [recipe=" .. recipe .. "]" .. suffix
+    end
+    return name
+end
+
 --- Alphabetical order for both network GUIs, ignoring ASCII letter case.
 function M.get_sorted_network_names(manual_only)
     local names = {}
@@ -267,6 +279,8 @@ function M.get_player_data(player_index)
     if not pdata.pinned_items then pdata.pinned_items = {} end
     if not pdata.pin_hud_elements then pdata.pin_hud_elements = {} end
     if not pdata.inventory_grid_cache then pdata.inventory_grid_cache = {} end
+    if not pdata.inventory_search then pdata.inventory_search = "" end
+    if not pdata.pin_sort then pdata.pin_sort = 1 end
     if pdata.opened_provider_chest == nil then pdata.opened_provider_chest = nil end
     if pdata.auto_pin_low_stock_enabled == nil then pdata.auto_pin_low_stock_enabled = false end
     if not pdata.auto_pinned_items then pdata.auto_pinned_items = {} end

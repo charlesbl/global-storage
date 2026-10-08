@@ -64,6 +64,19 @@ A passive provider chest that pulls items FROM the global pool and makes them av
 
 ## Global Inventory
 
+Search the inventory by translated or internal item name. Search ignores case
+and accents, works together with the no-limit filter, and remembers the query
+for each player. Clear it with the button beside the search field.
+
+Sort pinned HUD items from the inventory tab or directly above the HUD. Choose
+name A–Z/Z–A, quantity ascending/descending, or fill ratio ascending/descending.
+Manual and automatic pins keep their separate sections; automatic selection
+still prioritizes the ten lowest stock ratios. Items with unlimited or zero
+limits appear last when sorting by fill ratio. The choice is saved per player.
+
+Craft networks display `craft:` with their recipe icon in the network list and
+craft chest panel. Hover over the name to see the persistent network ID.
+
 The central item pool shared across all networks. Access it via **Shift+G**.
 
 ### Limits System
@@ -296,7 +309,10 @@ Upload the generated ZIP to the Mod Portal. To test locally, use this checkout i
 in Factorio's Mods menu. Use only one copy of this version at a time.
 
 Validation for this update was limited to static Lua compilation, checks against
-the bundled Factorio 2.0.77 API/prototypes and ZIP inspection. Factorio was not launched.
+the bundled Factorio 2.0.77 API/prototypes, GUI behaviour with Lua API doubles,
+and ZIP inspection. Run `python tests/check_inventory_view.py` with Python and
+`lupa` installed to check search, sorting, recipe captions and GUI events without
+starting the game. Factorio was not launched.
 In-game validation remains to be done: crafting and opening both chests, recipe
 copy/paste with a small inventory, provider requests without a linked network,
 personal requests with a full inventory and inactive sections, quality/spoilage

@@ -72,6 +72,10 @@ M.GUI = {
     INVENTORY_UNLIMITED_CHECKBOX = "gn_inventory_unlimited",
     INVENTORY_SET_LIMIT_BUTTON = "gn_inventory_set_limit",
     INVENTORY_FILTER_NO_LIMIT_CHECKBOX = "gn_inventory_filter_no_limit",
+    INVENTORY_SEARCH = "gn_inventory_search",
+    INVENTORY_SEARCH_CLEAR = "gn_inventory_search_clear",
+    INVENTORY_EMPTY_LABEL = "gn_inventory_empty",
+    PIN_SORT = "gn_pin_sort",
 
     -- Dynamic element prefixes (for live updates)
     INVENTORY_QUANTITY_LABEL = "gn_inv_qty_",

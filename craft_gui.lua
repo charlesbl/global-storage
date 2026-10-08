@@ -251,7 +251,8 @@ function M.update(player, chest)
     local selected = recipe and recipe.name or nil
     if picker.elem_value ~= selected then picker.elem_value = selected end
     inner[GUI.CRAFT_RECIPE_NAME].caption = recipe and recipe.localised_name or tr("global-storage-no-recipe", "Select a recipe")
-    inner[GUI.CRAFT_NETWORK_LABEL].caption = name
+    inner[GUI.CRAFT_NETWORK_LABEL].caption = state.network_caption(name)
+    inner[GUI.CRAFT_NETWORK_LABEL].tooltip = name
     M.update_craft_controls(inner, name, network, chest)
 end
 

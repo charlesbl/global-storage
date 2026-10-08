@@ -1,6 +1,7 @@
 local constants = require("constants")
 local state = require("state")
 local network_module = require("network")
+local inventory_view = require("inventory_view")
 
 local M = {}
 
@@ -184,7 +185,7 @@ function M.build_networks_tab(parent, player)
         local name_label = networks_table.add({
             type = "label",
             name = "gn_net_name_" .. network_name,
-            caption = network_name,
+            caption = state.network_caption(network_name),
             tooltip = network_name
         })
         name_label.style.maximal_width = 250
@@ -214,6 +215,7 @@ function M.build_networks_tab(parent, player)
 
         -- Cache element references for live updates
         pdata.network_element_cache[network_name] = {
+            name_label = name_label,
             chest_count_label = chests_label,
             request_count_label = reqs_label,
             status_label = status_label
@@ -248,6 +250,16 @@ end
 ---@param player LuaPlayer
 function M.build_inventory_tab(parent, player)
     local pdata = state.get_player_data(player.index)
+
+    local search_row = parent.add({ type = "flow", direction = "horizontal" })
+    search_row.style.vertical_align = "center"
+    search_row.add({ type = "label", caption = { "gui.global-storage-search" } })
+    local field = search_row.add({ type = "textfield", name = GUI.INVENTORY_SEARCH,
+        text = pdata.inventory_search, tooltip = { "gui.global-storage-search-tooltip" } })
+    field.style.width = 300
+    search_row.add({ type = "sprite-button", name = GUI.INVENTORY_SEARCH_CLEAR,
+        sprite = "utility/close", style = "tool_button", tooltip = { "gui.global-storage-clear-search" } })
+    M.add_pin_sort_control(parent, pdata)
 
     -- Filter checkbox + hint
     local filter_flow = parent.add({
@@ -286,42 +298,9 @@ function M.build_inventory_tab(parent, player)
     })
     grid.style.horizontal_spacing = 2
     grid.style.vertical_spacing = 2
-
-    -- Collect all items (from inventory and limits)
-    local all_items = {}
-    for item_name in pairs(storage.inventory) do
-        all_items[item_name] = true
-    end
-    for item_name in pairs(storage.limits) do
-        all_items[item_name] = true
-    end
-
-    -- Sort items
-    local sorted_items = {}
-    for item_name in pairs(all_items) do
-        sorted_items[#sorted_items + 1] = item_name
-    end
-    table.sort(sorted_items)
-
-    -- Apply filter if checkbox is checked (show only items with limit == 0)
-    if pdata.filter_no_limit then
-        local filtered_items = {}
-        for _, item_name in ipairs(sorted_items) do
-            local limit = storage.limits[item_name]
-            if limit == nil or limit == 0 then
-                filtered_items[#filtered_items + 1] = item_name
-            end
-        end
-        sorted_items = filtered_items
-    end
-
-    -- Initialize grid cache
-    pdata.inventory_grid_cache = {}
-
-    -- Add grid cells for each item
-    for _, item_name in ipairs(sorted_items) do
-        M.add_grid_cell(grid, item_name, pdata)
-    end
+    scroll.add({ type = "label", name = GUI.INVENTORY_EMPTY_LABEL,
+        caption = { "gui.global-storage-no-items" }, visible = false })
+    M.refresh_inventory_grid(player)
 
     -- Add limit section
     parent.add({ type = "line" })
@@ -339,6 +318,71 @@ function M.build_inventory_tab(parent, player)
         name = GUI.INVENTORY_ADD_LIMIT_BUTTON,
         elem_type = "item"
     })
+end
+
+-- Refresh only the grid: the search field keeps keyboard focus and cursor position.
+function M.refresh_inventory_grid(player)
+    local frame = player.gui.screen[GUI.NETWORK_FRAME]
+    local grid = frame and M.find_element(frame, GUI.INVENTORY_GRID)
+    if not grid then return end
+    local pdata = state.get_player_data(player.index)
+    local all_items = inventory_view.items()
+    inventory_view.request_names(player, pdata, all_items)
+    local matches = {}
+    for name in pairs(all_items) do
+        local limit = storage.limits[name]
+        if (not pdata.filter_no_limit or limit == nil or limit == 0)
+           and inventory_view.matches(name, pdata.inventory_search, pdata) then matches[name] = true end
+    end
+    local names = inventory_view.sorted(matches, pdata, "name")
+    grid.clear()
+    pdata.inventory_grid_cache = {}
+    for _, name in ipairs(names) do M.add_grid_cell(grid, name, pdata) end
+    local empty = M.find_element(frame, GUI.INVENTORY_EMPTY_LABEL)
+    if empty then empty.visible = #names == 0 end
+    pdata.inventory_items = all_items
+    pdata.inventory_view_dirty = false
+end
+
+function M.add_pin_sort_control(parent, pdata)
+    local row = parent.add({ type = "flow", direction = "horizontal" })
+    row.style.vertical_align = "center"
+    row.add({ type = "label", caption = { "gui.global-storage-pin-sort" } })
+    local items = {}
+    for _, mode in ipairs(inventory_view.sort_modes) do
+        items[#items + 1] = { "gui.global-storage-sort-" .. mode }
+    end
+    row.add({ type = "drop-down", name = GUI.PIN_SORT, items = items,
+        selected_index = pdata.pin_sort }).style.width = 200
+end
+
+-- Reorder existing HUD rows rather than destroying them on every stock update.
+function M.sort_pin_hud(player)
+    local pdata = state.get_player_data(player.index)
+    local frame = player.gui.left[GUI.PIN_HUD_FRAME]
+    if not frame then return end
+    local items = {}
+    for name in pairs(pdata.pinned_items) do items[name] = true end
+    for name in pairs(pdata.auto_pinned_items) do items[name] = true end
+    inventory_view.request_names(player, pdata, items)
+    local mode = inventory_view.sort_modes[pdata.pin_sort] or "name"
+    for _, section in ipairs({
+        { GUI.PIN_HUD_MANUAL_SECTION, pdata.pinned_items, GUI.PIN_HUD_FLOW, 0 },
+        { GUI.PIN_HUD_AUTO_SECTION, pdata.auto_pinned_items, GUI.AUTO_PIN_HUD_FLOW, 1 },
+    }) do
+        local parent = frame[section[1]]
+        if parent then
+            local target = section[4]
+            for _, name in ipairs(inventory_view.sorted(section[2], pdata, mode)) do
+                local row = parent[section[3] .. name]
+                if row then
+                    target = target + 1
+                    local current = row.get_index_in_parent()
+                    if current ~= target then parent.swap_children(current, target) end
+                end
+            end
+        end
+    end
 end
 
 --- Add a single cell to the inventory grid
@@ -373,7 +417,8 @@ function M.add_grid_cell(grid, item_name, pdata)
         type = "sprite-button",
         name = GUI.INVENTORY_GRID_CELL .. item_name,
         sprite = "item/" .. item_name,
-        tooltip = item_name .. "\n" .. status_text .. (is_pinned and "\n[Pinned]" or "") .. "\nClick to edit",
+        tooltip = { "", prototypes.item[item_name].localised_name, "\n", item_name,
+            "\n", status_text, is_pinned and "\n[Pinned]" or "", "\nClick to edit" },
         tags = { item_name = item_name },
         style = "slot_button"
     })
@@ -666,6 +711,7 @@ function M.get_or_create_hud(player)
         direction = "vertical"
     })
     frame.style.padding = 4
+    M.add_pin_sort_control(frame, state.get_player_data(player.index))
 
     -- Create manual section (vertical flow for rows)
     frame.add({
@@ -705,6 +751,7 @@ end
 ---@param player LuaPlayer
 ---@param item_name string
 function M.add_item_to_hud(player, item_name)
+    if not prototypes.item[item_name] then return end
     local pdata = state.get_player_data(player.index)
     local frame = M.get_or_create_hud(player)
     if not frame then return end
@@ -726,7 +773,7 @@ function M.add_item_to_hud(player, item_name)
     row.add({
         type = "sprite",
         sprite = "item/" .. item_name,
-        tooltip = item_name
+        tooltip = prototypes.item[item_name].localised_name
     })
 
     local qty_label = row.add({
@@ -753,6 +800,7 @@ function M.add_item_to_hud(player, item_name)
         qty_label = qty_label,
         limit_label = limit_label
     }
+    M.sort_pin_hud(player)
 end
 
 --- Remove an item from the HUD (manual section)
@@ -799,7 +847,10 @@ local function calculate_low_stock_items()
     end
 
     -- Sort by lowest percentage first
-    table.sort(low_stock, function(a, b) return a.percentage < b.percentage end)
+    table.sort(low_stock, function(a, b)
+        if a.percentage == b.percentage then return a.name < b.name end
+        return a.percentage < b.percentage
+    end)
 
     -- Limit to max items
     local result = {}
@@ -816,6 +867,7 @@ end
 ---@param item_name string
 ---@param percentage number Stock percentage (0-1)
 function M.add_auto_pin_to_hud(player, item_name, percentage)
+    if not prototypes.item[item_name] then return end
     local pdata = state.get_player_data(player.index)
     local frame = M.get_or_create_hud(player)
     if not frame then return end
@@ -999,7 +1051,7 @@ function M.update_pin_hud(player)
     -- Also check if existing HUD has correct structure
     if frame and frame.valid then
         local manual_section = frame[GUI.PIN_HUD_MANUAL_SECTION]
-        if not manual_section or manual_section.type ~= "flow" then
+        if not manual_section or manual_section.type ~= "flow" or not M.find_element(frame, GUI.PIN_SORT) then
             needs_refresh = true
         end
     end
@@ -1049,6 +1101,7 @@ function M.update_pin_hud(player)
             end
         end
     end
+    M.sort_pin_hud(player)
 end
 
 --- Restore HUD for a player (called on join)
@@ -1075,6 +1128,8 @@ function M.restore_pin_hud(player)
         M.update_auto_pinned_items(player)
         has_pins = has_pins or next(pdata.auto_pinned_items) ~= nil
     end
+
+    M.sort_pin_hud(player)
 
     -- Remove empty HUD frame
     if not has_pins then
@@ -1126,7 +1181,7 @@ function M.create_delete_confirm_popup(player, network_name, chest_count)
     })
     inner.add({
         type = "label",
-        caption = { "gui.delete-network-confirm-message", network_name, chest_count }
+        caption = { "gui.delete-network-confirm-message", state.network_caption(network_name), chest_count }
     })
     inner.add({
         type = "label",
@@ -1302,6 +1357,16 @@ function M.on_gui_click(event)
     local player = game.get_player(event.player_index)
     if not player then return end
 
+    if element.name == GUI.INVENTORY_SEARCH_CLEAR then
+        local pdata = state.get_player_data(player.index)
+        pdata.inventory_search = ""
+        local frame = player.gui.screen[GUI.NETWORK_FRAME]
+        local field = frame and M.find_element(frame, GUI.INVENTORY_SEARCH)
+        if field then field.text = ""; field.focus() end
+        M.refresh_inventory_grid(player)
+        return
+    end
+
     local tags = element.tags
 
     -- Grid cell clicked - open edit popup
@@ -1338,12 +1403,14 @@ function M.on_gui_click(event)
                 if pdata_entry.auto_pinned_items then pdata_entry.auto_pinned_items[item_name] = nil end
                 if pdata_entry.pin_hud_elements and pdata_entry.pin_hud_elements[item_name] then
                     local elems = pdata_entry.pin_hud_elements[item_name]
-                    if elems.flow and elems.flow.valid then elems.flow.destroy() end
+                    local row = elems.row or elems.flow
+                    if row and row.valid then row.destroy() end
                     pdata_entry.pin_hud_elements[item_name] = nil
                 end
                 if pdata_entry.auto_pin_hud_elements and pdata_entry.auto_pin_hud_elements[item_name] then
                     local elems = pdata_entry.auto_pin_hud_elements[item_name]
-                    if elems.flow and elems.flow.valid then elems.flow.destroy() end
+                    local row = elems.row or elems.flow
+                    if row and row.valid then row.destroy() end
                     pdata_entry.auto_pin_hud_elements[item_name] = nil
                 end
             end
@@ -1416,6 +1483,15 @@ function M.on_gui_text_changed(event)
     if not element or not element.valid then return end
     if not element.name then return end
 
+    if element.name == GUI.INVENTORY_SEARCH then
+        local player = game.get_player(event.player_index)
+        if player then
+            state.get_player_data(player.index).inventory_search = element.text
+            M.refresh_inventory_grid(player)
+        end
+        return
+    end
+
     -- The textfield itself holds the draft; typing must not change storage.
     if element.name == GUI.INVENTORY_EDIT_LIMIT_FIELD then return end
 
@@ -1474,8 +1550,7 @@ function M.on_gui_checked_state_changed(event)
     if element.name == GUI.INVENTORY_FILTER_NO_LIMIT_CHECKBOX then
         local pdata = state.get_player_data(player.index)
         pdata.filter_no_limit = element.state
-        -- Rebuild inventory tab to apply filter
-        M.rebuild_inventory_tab(player)
+        M.refresh_inventory_grid(player)
         return
     end
 
@@ -1522,6 +1597,44 @@ function M.on_gui_checked_state_changed(event)
     end
 end
 
+function M.on_gui_selection_state_changed(event)
+    local element = event.element
+    if not element or not element.valid or element.name ~= GUI.PIN_SORT then return end
+    local player = game.get_player(event.player_index)
+    if not player or not inventory_view.sort_modes[element.selected_index] then return end
+    local pdata = state.get_player_data(player.index)
+    pdata.pin_sort = element.selected_index
+    for _, surface in ipairs({ player.gui.screen, player.gui.left }) do
+        local dropdown = M.find_element(surface, GUI.PIN_SORT)
+        if dropdown then dropdown.selected_index = pdata.pin_sort end
+    end
+    M.sort_pin_hud(player)
+end
+
+function M.on_string_translated(event)
+    local player = game.get_player(event.player_index)
+    if not player then return end
+    local pdata = state.get_player_data(player.index)
+    local name = pdata.item_name_requests and pdata.item_name_requests[event.id]
+    if not name then return end -- Ignore translation requests from other mods.
+    pdata.item_name_requests[event.id] = nil
+    pdata.item_name_pending[name] = nil
+    pdata.item_names[name] = event.translated and event.result or name
+    pdata.inventory_view_dirty = true
+end
+
+function M.on_player_locale_changed(event)
+    local player = game.get_player(event.player_index)
+    if not player then return end
+    local pdata = state.get_player_data(player.index)
+    pdata.item_names = {}
+    pdata.item_name_requests = {}
+    pdata.item_name_pending = {}
+    pdata.inventory_view_dirty = true
+    if player.gui.screen[GUI.NETWORK_FRAME] then M.refresh_inventory_grid(player) end
+    M.sort_pin_hud(player)
+end
+
 --- Handle confirmed events (Enter key pressed in textfield)
 ---@param event EventData.on_gui_confirmed
 function M.on_gui_confirmed(event)
@@ -1565,6 +1678,14 @@ function M.update_live(player)
 
     -- Only update the currently visible tab
     if selected_tab == 2 then
+        local current = inventory_view.items()
+        local previous = pdata.inventory_items or {}
+        local changed = pdata.inventory_view_dirty
+        for name in pairs(current) do if not previous[name] then changed = true; break end end
+        if not changed then
+            for name in pairs(previous) do if not current[name] then changed = true; break end end
+        end
+        if changed then M.refresh_inventory_grid(player) end
         -- Update inventory grid quantities using cached references
         local cache = pdata.inventory_grid_cache
         if cache then
@@ -1601,6 +1722,9 @@ function M.update_live(player)
             for network_name, network in pairs(storage.networks) do
                 local cached = cache[network_name]
                 if cached then
+                    if cached.name_label and cached.name_label.valid then
+                        cached.name_label.caption = state.network_caption(network_name)
+                    end
                     -- Update chest count
                     if cached.chest_count_label and cached.chest_count_label.valid then
                         cached.chest_count_label.caption = tostring(network.chest_count or 0)
