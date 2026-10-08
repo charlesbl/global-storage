@@ -61,13 +61,10 @@ local function process_player(player)
     -- 3. COLLECT TRASH: Empty trash into global pool (bypass limits)
     local trash_inv = player.get_inventory(defines.inventory.character_trash)
     if trash_inv then
-        local contents = trash_inv.get_contents()
-        for _, item in pairs(contents) do
-            if pool_items.can_store(item) then
-                local removed = trash_inv.remove({ name = item.name, quality = "normal", count = item.count })
-                if removed > 0 then
-                    storage.inventory[item.name] = (storage.inventory[item.name] or 0) + removed
-                end
+        for name, count in pairs(pool_items.get_counts(trash_inv)) do
+            local removed = pool_items.remove(trash_inv, name, count)
+            if removed > 0 then
+                storage.inventory[name] = (storage.inventory[name] or 0) + removed
             end
         end
     end

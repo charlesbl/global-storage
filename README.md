@@ -277,8 +277,10 @@ Items above 1000 are collected to global storage. When any chest drops below 100
 - **Multiplayer**: Supported
 - **Safe to add mid-game**: Yes
 
-The global quantity pool accepts ordinary items, modules and capsules of **normal quality**.
-Higher-quality items, perishable items, ammo, tools, blueprints, armor and other items
+The global quantity pool accepts ordinary items, modules, capsules and fresh,
+non-perishable science packs/tools of **normal quality**. Partially consumed
+tool stacks keep their remaining durability in physical inventories.
+Higher-quality items, perishable items, ammo, blueprints, armor and other items
 with stack-specific data remain in physical linked inventories or player trash slots.
 They are never converted to normal items by the pool. Empty those items before deleting
 a network. Personal logistics supplies normal-quality requests from active sections and
@@ -317,6 +319,8 @@ the bundled Factorio 2.0.77 API/prototypes, GUI behaviour with Lua API doubles,
 and ZIP inspection. Run `python tests/check_inventory_view.py` with Python and
 `lupa` installed to check search, sorting, recipe captions and GUI events without
 starting the game. Factorio was not launched.
+Run `python tests/check_science_pool.py` to check science pack collection,
+durability preservation, limits, redistribution and personal trash with API doubles.
 In-game validation remains to be done: crafting and opening both chests, recipe
 copy/paste with a small inventory, provider requests without a linked network,
 personal requests with a full inventory and inactive sections, quality/spoilage

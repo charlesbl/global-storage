@@ -217,9 +217,7 @@ function M.can_delete_network(name)
     for _, force in pairs(game.forces) do
         local inventory = force.get_linked_inventory(network.entity_name or constants.GLOBAL_CHEST_ENTITY_NAME, network.link_id)
         if inventory then
-            for _, item in pairs(inventory.get_contents()) do
-                if not pool_items.can_store(item) then return false end
-            end
+            if not pool_items.can_store_all(inventory) then return false end
         end
     end
     return true
@@ -237,10 +235,10 @@ function M.delete_network(name)
     for _, inventory_force in pairs(game.forces) do
         local linked_inv = inventory_force.get_linked_inventory(network.entity_name or constants.GLOBAL_CHEST_ENTITY_NAME, link_id)
         if linked_inv then
-            for _, item in pairs(linked_inv.get_contents()) do
-                local removed = linked_inv.remove({ name = item.name, quality = "normal", count = item.count })
+            for name, count in pairs(pool_items.get_counts(linked_inv)) do
+                local removed = pool_items.remove(linked_inv, name, count)
                 -- Bypass limits, but only credit items actually removed.
-                storage.inventory[item.name] = (storage.inventory[item.name] or 0) + removed
+                storage.inventory[name] = (storage.inventory[name] or 0) + removed
             end
         end
     end

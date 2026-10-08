@@ -20,14 +20,17 @@ local function process_network(network_name, network, force)
     if not linked_inv then return end
 
     local content_counts = pool_items.get_counts(linked_inv)
+    -- Used packs remain physical, but still count towards a chest's request.
+    -- Otherwise replenishment could repeatedly insert into a partially used stack.
+    local request_counts = next(network.requests) and pool_items.get_counts(linked_inv, true) or content_counts
 
     -- 1. Collect surplus (items above max or not in requests)
     for item_name, count in pairs(content_counts) do
         local request = network.requests[item_name]
         local max_wanted = request and request.max or 0
 
-        if count > max_wanted then
-            local surplus = count - max_wanted
+        local surplus = math.min(count, (request_counts[item_name] or count) - max_wanted)
+        if surplus > 0 then
 
             -- Check global limit (nil = blocked, -1 = unlimited, >0 = numeric limit)
             local limit = storage.limits[item_name]
@@ -45,7 +48,7 @@ local function process_network(network_name, network, force)
             end
 
             if can_accept > 0 then
-                local removed = linked_inv.remove({ name = item_name, quality = "normal", count = can_accept })
+                local removed = pool_items.remove(linked_inv, item_name, can_accept)
                 if removed > 0 then
                     storage.inventory[item_name] = (storage.inventory[item_name] or 0) + removed
                 end
@@ -55,7 +58,7 @@ local function process_network(network_name, network, force)
 
     -- 2. Distribute to meet minimum requests
     for item_name, request in pairs(network.requests) do
-        local current = content_counts[item_name] or 0
+        local current = request_counts[item_name] or 0
 
         if current < request.min then
             local needed = request.min - current

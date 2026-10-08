@@ -54,8 +54,9 @@ A powerful networked storage system that lets you manage items across your entir
 
 ## Compatibility
 Requires Factorio 2.0.77 or newer in the 2.0 series. The global quantity pool handles
-ordinary items, modules and capsules of normal quality. Higher-quality and perishable
-items, ammo, tools, blueprints, armor and other stacks with individual data stay in
+ordinary items, modules, capsules and fresh non-perishable science packs/tools of
+normal quality. Higher-quality and perishable items, partially consumed tool
+stacks, ammo, blueprints, armor and other stacks with individual data stay in
 physical inventories. Remove them before deleting a network. Network configuration
 and the global pool are shared across forces; linked chest inventories are per force.
 

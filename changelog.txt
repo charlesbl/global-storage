@@ -22,6 +22,7 @@ Date: 2026-10-08
     - Restore chest settings when built or revived by players, robots or scripts, and when cloned.
     - Add French translations for craft controls, slot summaries and network icon controls.
   Bugfixes:
+    - Accept fresh normal-quality science packs (tool prototypes) in the global pool; preserve partially consumed tool stacks and keep perishable science excluded.
     - Fix the craft chest GUI crash caused by applying summary spacing to a frame.
     - Hide craft controls while no recipe is selected and make recipe ingredient requests read-only.
     - Apply pool limits, unlimited storage and HUD pin edits only on OK or Enter; closing the popup discards pending edits.
