@@ -57,6 +57,7 @@ function M.create_relative_panel(player)
         caption = "[No network]"
     })
     network_label.style.font = "default-bold"
+    network_label.style.rich_text_setting = defines.rich_text_setting.enabled
     network_label.style.left_margin = 4
     network_label.style.right_margin = 8
 
@@ -94,6 +95,17 @@ function M.create_relative_panel(player)
         text = ""
     })
     network_field.style.width = 220
+    network_field.tooltip = {
+        "?", { "gui.global-storage-network-icon-syntax" },
+        "Icon tags are part of the network ID and can be edited in this field."
+    }
+    edit_row1.add({
+        type = "choose-elem-button", name = GUI.CHEST_NETWORK_ICON,
+        elem_type = "signal", tooltip = {
+            "?", { "gui.global-storage-network-icon-tooltip" },
+            "Choose a signal to add its icon to the network ID."
+        }
+    })
 
     -- Row 2: Buttons (Validate + Cancel)
     local edit_row2 = edit_flow.add({
@@ -129,7 +141,7 @@ function M.create_relative_panel(player)
     inner.add({ type = "line" })
     inner.add({
         type = "label",
-        caption = "Requests",
+        name = "gn_chest_requests_header", caption = "Requests",
         style = "caption_label"
     })
 
@@ -379,14 +391,7 @@ function M.populate_network_list(edit_flow)
     list_scroll.clear()
 
     -- Get only manual network names (not from copy-paste of recipes)
-    local networks = storage.networks or {}
-    local network_names = {}
-    for name, data in pairs(networks) do
-        if data.manual then
-            table.insert(network_names, name)
-        end
-    end
-    table.sort(network_names)
+    local network_names = state.get_sorted_network_names(true)
 
     -- Create buttons for each manual network
     for _, name in ipairs(network_names) do
@@ -724,6 +729,28 @@ end
 function M.on_gui_elem_changed(event)
     local element = event.element
     if not element or not element.valid then return end
+    if element.name == GUI.CHEST_NETWORK_ICON then
+        local selected = element.elem_value
+        if not selected or not selected.name then return end
+        local player = game.get_player(event.player_index)
+        if not player then return end
+        local panel = player.gui.relative[GUI.CHEST_RELATIVE_PANEL]
+        local inner = panel and panel[GUI.CHEST_FRAME]
+        local edit_flow = inner and inner[GUI.CHEST_NETWORK_EDIT_FLOW]
+        local field = edit_flow and M.find_element(edit_flow, GUI.CHEST_NETWORK_ID_FIELD)
+        if field and edit_flow.visible then
+            -- SignalID omits the type for items. Virtual signals use a different sprite prefix.
+            local kind = selected.type or "item"
+            if kind == "virtual" then kind = "virtual-signal" end
+            local separator = ""
+            if field.text ~= "" and not field.text:match("%s$") then separator = " " end
+            field.text = field.text .. separator .. "[img=" .. kind .. "/" .. selected.name .. "]"
+            field.focus()
+        end
+        -- Reset so the same resource can be inserted more than once.
+        element.elem_value = nil
+        return
+    end
     if not element.name or not element.name:find(GUI.CHEST_REQUEST_SLOT) then return end
 
     local player = game.get_player(event.player_index)

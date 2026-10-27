@@ -1,5 +1,43 @@
 local constants = require("constants")
 
+-- Each chest shares the same silhouette, with its own colour and lid symbol.
+local function apply_skin(entity, item, skin)
+    local root = "__global-storage__/graphics/"
+    entity.icon = root .. "icons/" .. skin .. ".png"
+    entity.icon_size = 32
+    entity.icons = nil
+    item.icon = entity.icon
+    item.icon_size = entity.icon_size
+    item.icons = nil
+
+    local sprite = {
+        filename = root .. "entity/" .. skin .. ".png",
+        priority = "extra-high",
+        width = 64,
+        height = 64,
+        shift = { 0, -0.0625 },
+        -- The chest occupies about 54 of the 64 pixels; match vanilla's
+        -- 33-pixel visible width instead of scaling the transparent canvas.
+        scale = 0.625,
+    }
+    if entity.robot_door then
+        -- Factorio 2.1 stores logistic chest animation inside robot_door.
+        sprite.frame_count = 1
+        local shadow = table.deepcopy(entity.robot_door.animation.layers[2])
+        shadow.repeat_count = 1
+        entity.robot_door.animation = { layers = { sprite, shadow } }
+    elseif entity.animation then
+        -- A single closed-lid frame keeps the custom provider sprite visible.
+        sprite.frame_count = 1
+        local shadow = table.deepcopy(entity.animation.layers[2])
+        shadow.repeat_count = 1
+        entity.animation = { layers = { sprite, shadow } }
+    else
+        local shadow = table.deepcopy(entity.picture.layers[2])
+        entity.picture = { layers = { sprite, shadow } }
+    end
+end
+
 -- Custom subgroup for global storage items (own row in crafting menu)
 local global_storage_subgroup = {
     type = "item-subgroup",
@@ -11,6 +49,8 @@ local global_storage_subgroup = {
 -- Entity
 local global_chest_entity = table.deepcopy(data.raw["linked-container"]["linked-chest"])
 global_chest_entity.name = constants.GLOBAL_CHEST_ENTITY_NAME
+global_chest_entity.hidden = false
+global_chest_entity.gui_mode = "all"
 global_chest_entity.inventory_type = "with_filters_and_bar"
 global_chest_entity.inventory_size = settings.startup["global-storage-chest-slots"].value
 global_chest_entity.minable.result = global_chest_entity.name
@@ -18,6 +58,7 @@ global_chest_entity.minable.result = global_chest_entity.name
 -- Item
 local global_chest_item = table.deepcopy(data.raw["item"]["linked-chest"])
 global_chest_item.name = constants.GLOBAL_CHEST_ENTITY_NAME
+global_chest_item.hidden = false
 global_chest_item.place_result = global_chest_entity.name
 global_chest_item.subgroup = "global-storage"
 global_chest_item.order = "c[global-chest]"
@@ -35,6 +76,19 @@ local global_chest_recipe = {
     subgroup = "global-storage",
     order = "c[global-chest]",
 }
+
+-- Separate linked inventory prototype and interface for recipe-driven chests.
+local craft_entity = table.deepcopy(global_chest_entity)
+craft_entity.name = constants.GLOBAL_CRAFT_CHEST_ENTITY_NAME
+craft_entity.minable.result = craft_entity.name
+local craft_item = table.deepcopy(global_chest_item)
+craft_item.name = craft_entity.name
+craft_item.place_result = craft_entity.name
+craft_item.order = "c[global-craft-chest]"
+local craft_recipe = table.deepcopy(global_chest_recipe)
+craft_recipe.name = craft_entity.name
+craft_recipe.results = {{ type = "item", name = craft_item.name, amount = 1 }}
+craft_recipe.order = craft_item.order
 
 -- Hotkey for network GUI (Shift+G)
 local network_gui_hotkey = {
@@ -70,11 +124,18 @@ local global_provider_recipe = {
     order = "c[global-provider-chest]",
 }
 
+apply_skin(global_chest_entity, global_chest_item, "global-chest")
+apply_skin(craft_entity, craft_item, "global-craft-chest")
+apply_skin(global_provider_entity, global_provider_item, "global-provider-chest")
+
 data:extend({
     global_storage_subgroup,
     global_chest_item,
     global_chest_recipe,
     global_chest_entity,
+    craft_entity,
+    craft_item,
+    craft_recipe,
     network_gui_hotkey,
     global_provider_item,
     global_provider_recipe,

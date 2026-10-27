@@ -11,6 +11,7 @@ local M = {}
 function M.set_request(network_name, item_name, min, max)
     local network = state.get_or_create_network(network_name)
     if not network then return end
+    if network.entity_name == constants.GLOBAL_CRAFT_CHEST_ENTITY_NAME then return end
 
     if min <= 0 and max <= 0 then
         network.requests[item_name] = nil
@@ -27,6 +28,7 @@ end
 ---@param item_name string
 function M.remove_request(network_name, item_name)
     local network = storage.networks[network_name]
+    if network and network.entity_name == constants.GLOBAL_CRAFT_CHEST_ENTITY_NAME then return end
     if network then
         network.requests[item_name] = nil
     end
@@ -51,6 +53,12 @@ end
 function M.set_chest_network(chest, new_network_name, manual)
     if not chest or not chest.valid then return end
 
+    local target = nil
+    if new_network_name and new_network_name ~= "" then
+        target = state.get_or_create_network(new_network_name, manual, chest.name)
+        if not target then return false end
+    end
+
     -- Get old network from our tracking (not from link_id which may be stale after copy-paste)
     local old_network_name = state.get_chest_tracked_network(chest.unit_number)
 
@@ -63,7 +71,7 @@ function M.set_chest_network(chest, new_network_name, manual)
     -- Set new link_id and update tracking
     if new_network_name and new_network_name ~= "" then
         -- Create network if needed (allocates link_id) and increment chest count
-        local network = state.get_or_create_network(new_network_name, manual)
+        local network = target
         if network then
             chest.link_id = network.link_id
             state.set_chest_tracked_network(chest.unit_number, new_network_name)
@@ -82,7 +90,9 @@ function M.get_chest_network_name(chest)
     if not chest or not chest.valid then return nil end
     local link_id = chest.link_id
     if link_id == 0 then return nil end
-    return state.get_network_name(link_id)
+    local name = state.get_network_name(link_id)
+    local network = name and storage.networks[name]
+    if network and (network.entity_name or constants.GLOBAL_CHEST_ENTITY_NAME) == chest.name then return name end
 end
 
 --- Increment chest count for a network (called when chest built with existing link_id)

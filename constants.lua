@@ -2,8 +2,10 @@ local M = {}
 
 -- Entity
 M.GLOBAL_CHEST_ENTITY_NAME = "global-chest"
+M.GLOBAL_CRAFT_CHEST_ENTITY_NAME = "global-craft-chest"
 M.GLOBAL_PROVIDER_CHEST_ENTITY_NAME = "global-provider-chest"
 M.DEFAULT_NETWORK_NAME = "global-storage-default"
+M.DEFAULT_CRAFT_NETWORK_NAME = "global-craft-default"
 
 -- Hotkeys
 M.NETWORK_GUI_HOTKEY = "global-network-hotkey"
@@ -15,6 +17,20 @@ M.GUI = {
     CHEST_FRAME = "gn_chest_frame",
     CHEST_NETWORK_ID_FIELD = "gn_chest_network_id",
     CHEST_NETWORK_ID_LABEL = "gn_chest_network_id_label",
+    CHEST_NETWORK_ICON = "gn_chest_network_icon",
+    CHEST_CRAFT_FLOW = "gn_chest_craft_flow",
+    CHEST_CRAFT_SLIDER = "gn_chest_craft_slider",
+    CHEST_CRAFT_FIELD = "gn_chest_craft_field",
+    CHEST_CRAFT_APPLY = "gn_chest_craft_apply",
+    CHEST_OUTPUT_FLOW = "gn_chest_output_flow",
+    CHEST_OUTPUT_SLIDER = "gn_chest_output_slider",
+    CHEST_OUTPUT_LABEL = "gn_chest_output_label",
+    CHEST_CRAFT_SUMMARY = "gn_chest_craft_summary",
+    CRAFT_RELATIVE_PANEL = "gn_craft_panel",
+    CRAFT_FRAME = "gn_craft_frame",
+    CRAFT_RECIPE_PICKER = "gn_craft_recipe_picker",
+    CRAFT_RECIPE_NAME = "gn_craft_recipe_name",
+    CRAFT_NETWORK_LABEL = "gn_craft_network_label",
     CHEST_NETWORK_EDIT_BUTTON = "gn_chest_network_edit",
     CHEST_NETWORK_CONFIRM_BUTTON = "gn_chest_network_confirm",
     CHEST_NETWORK_CANCEL_BUTTON = "gn_chest_network_cancel",
@@ -56,6 +72,11 @@ M.GUI = {
     INVENTORY_UNLIMITED_CHECKBOX = "gn_inventory_unlimited",
     INVENTORY_SET_LIMIT_BUTTON = "gn_inventory_set_limit",
     INVENTORY_FILTER_NO_LIMIT_CHECKBOX = "gn_inventory_filter_no_limit",
+    INVENTORY_SEARCH = "gn_inventory_search",
+    INVENTORY_SEARCH_CLEAR = "gn_inventory_search_clear",
+    INVENTORY_EMPTY_LABEL = "gn_inventory_empty",
+    PIN_SORT = "gn_pin_sort",
+    INVENTORY_SORT = "gn_inventory_sort",
 
     -- Dynamic element prefixes (for live updates)
     INVENTORY_QUANTITY_LABEL = "gn_inv_qty_",
