@@ -20,7 +20,13 @@ local function apply_skin(entity, item, skin)
         -- 33-pixel visible width instead of scaling the transparent canvas.
         scale = 0.625,
     }
-    if entity.animation then
+    if entity.robot_door then
+        -- Factorio 2.1 stores logistic chest animation inside robot_door.
+        sprite.frame_count = 1
+        local shadow = table.deepcopy(entity.robot_door.animation.layers[2])
+        shadow.repeat_count = 1
+        entity.robot_door.animation = { layers = { sprite, shadow } }
+    elseif entity.animation then
         -- A single closed-lid frame keeps the custom provider sprite visible.
         sprite.frame_count = 1
         local shadow = table.deepcopy(entity.animation.layers[2])

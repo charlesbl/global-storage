@@ -42,7 +42,8 @@ function M.set_multiplier(network, recipe_name, multiplier)
     network.craft_recipe = recipe_name
     network.craft_multiplier = multiplier
     local minimum_outputs = #M.output_names(recipe_name)
-    network.craft_output_slots = math.max(minimum_outputs, network.craft_output_slots or minimum_outputs)
+    network.craft_output_slots = minimum_outputs == 0 and 0
+        or math.max(minimum_outputs, network.craft_output_slots or minimum_outputs)
     network.requests = requests
     return true
 end
@@ -115,7 +116,7 @@ function M.slot_layout(network)
     for _, name in ipairs(M.output_names(network.craft_recipe)) do
         outputs[#outputs + 1] = { name = name }
     end
-    local output_slots = math.max(#outputs, network.craft_output_slots or #outputs)
+    local output_slots = #outputs == 0 and 0 or math.max(#outputs, network.craft_output_slots or #outputs)
     local missing_output = false
     for index, output in ipairs(outputs) do
         output.slots = math.floor(output_slots / #outputs) + (index <= output_slots % #outputs and 1 or 0)

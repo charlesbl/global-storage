@@ -85,6 +85,11 @@ function M.init()
 
     -- Rebuild reverse mapping and ensure counter stays ahead of all allocated IDs
     for name, network in pairs(storage.networks) do
+        -- Recipes, stack sizes and chest capacity may change with configuration.
+        -- Rebuild craft requests and filters on the next ensure(), keeping settings.
+        if network.entity_name == constants.GLOBAL_CRAFT_CHEST_ENTITY_NAME then
+            network.craft_slot_layout_version = nil
+        end
         if network.link_id then
             storage.link_id_to_network[network.link_id] = name
             if network.link_id >= storage.next_link_id then

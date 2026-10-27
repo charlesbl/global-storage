@@ -21,8 +21,8 @@ def build(output_dir: Path) -> Path:
         raise ValueError("info.json: invalid mod name")
     if not re.fullmatch(r"\d+\.\d+\.\d+", version):
         raise ValueError("info.json: version must have the form major.minor.patch")
-    if info.get("factorio_version") != "2.0":
-        raise ValueError("This release targets Factorio 2.0")
+    if info.get("factorio_version") != "2.1":
+        raise ValueError("This release targets Factorio 2.1")
     for required in ("info.json", "data.lua", "control.lua", "settings.lua", "thumbnail.png"):
         if not (ROOT / required).is_file():
             raise ValueError(f"Missing required file: {required}")

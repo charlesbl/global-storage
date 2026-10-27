@@ -92,7 +92,7 @@ function M.apply(entity, settings)
             saved.craft_recipe = settings.craft_recipe
         end
         saved.craft_multiplier = settings.craft_multiplier == nil and 10 or math.max(1, quantity(settings.craft_multiplier))
-        saved.craft_output_slots = math.max(1, quantity(settings.craft_output_slots))
+        saved.craft_output_slots = quantity(settings.craft_output_slots)
     end
     if entity.type == "entity-ghost" then
         local tags = entity.tags or {}

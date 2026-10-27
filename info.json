@@ -3,9 +3,9 @@
   "version": "0.1.4",
   "title": "Global Storage",
   "author": "charlesbl",
-  "factorio_version": "2.0",
+  "factorio_version": "2.1",
   "dependencies": [
-    "base >= 2.0.77"
+    "base >= 2.1.23"
   ],
-  "description": "Adds a global storage network using linked chests. Set network IDs to share inventory between chests. Use dedicated craft chests to select recipes and configure ingredient quantities and output slots."
+  "description": "Now includes three chest types: Global Chest for manual shared storage, the new Global Craft Chest for recipe-driven networks, and Global Provider Chest for logistics bots. Automate transfers through a global item pool with personal logistics, storage limits, searchable and sortable inventory, HUD pins and blueprint settings."
 }

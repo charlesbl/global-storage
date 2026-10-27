@@ -1,18 +1,22 @@
-# Global Network
+# Global Storage
 
-A global item storage and logistics system for Factorio 2.0+. Manage a centralized inventory pool with network-based requests, perfect for megabases.
+A global item storage and logistics system for Factorio 2.1.23+. Manage a centralized inventory pool with network-based requests, perfect for megabases.
 
 ---
 
 ## Core Concept
 
-Global Network provides a **shared global inventory** that all your chests can access. Instead of managing individual chest contents, you define **networks** with item requests, and the mod automatically distributes items to where they're needed.
+Global Storage provides a **shared global inventory** that all your chests can access. Instead of managing individual chest contents, you define **networks** with item requests, and the mod automatically distributes items to where they're needed.
 
 **Key insight:** Requests are defined at the **network level**, not per-chest. This means the mod processes dozens of networks instead of thousands of individual chests, making it highly performant for large bases.
 
 ---
 
 ## Chests
+
+Version 0.1.4 has **three chest types instead of two**. Version 0.1.3 provided
+the Global Chest and Global Provider Chest; this update adds the separate
+Global Craft Chest for recipe-driven networks.
 
 All three chests use the craft chest's industrial body, frame and latch, with
 custom skins and matching inventory icons:
@@ -29,6 +33,7 @@ A linked container that shares its inventory with all other Global Chests on the
 
 - **Network ID**: Text-based identifier (e.g., "iron-gear-wheel", "main-storage", "mall")
 - **Shared Inventory**: All chests with the same network ID share the exact same inventory
+- **Capacity**: Additional chests add access points, not inventory slots. The startup setting controls each linked inventory's capacity.
 - **Requests**: Define min/max quantities per item at the network level
 
 **How it works:**
@@ -46,11 +51,21 @@ pasted from assembling machines and furnaces.
 All craft chests selecting the same recipe share a recipe network, its inventory,
 multiplier and output reservation. These inventories are separate from normal
 Global Chest networks. A new recipe network defaults to ten crafts (×10).
+Craft chests supply ingredients and collect outputs; assembling machines and
+furnaces still perform the crafting.
 
 Existing Global Chests remain normal chests: their inventories and requests are
 preserved, including former craft networks, which become editable manual networks.
 Their former automatic slot filters are cleared. Place the new Global Craft Chest
 to use the dedicated recipe controls.
+
+In 0.1.3, pasting an assembler or furnace recipe onto a normal Global Chest
+created a `craft:` network requesting one stack of each item ingredient. In
+0.1.4, machine recipe import belongs to the new Global Craft Chest, which uses
+exact ingredient quantities times its multiplier (×10 by default). Normal
+Global Chests keep manual requests and no longer import machine recipes.
+Old chests are not automatically replaced or converted; the new craft inventory
+is separate from their existing normal-chest inventory.
 
 ### Global Provider Chest
 
@@ -118,6 +133,7 @@ Press **Shift+G** to open the management interface with three tabs:
 ### Player Tab
 - Enable/disable player logistics integration
 - Toggle auto-pin for low stock items
+- Choose the HUD pin sort order independently of the inventory sort order
 
 ---
 
@@ -137,7 +153,8 @@ is selected. Without a recipe, only recipe selection is shown. At **×1**,
 each item request equals its ingredient quantity in one craft; **×2** requests
 twice that quantity, and so on. Both request minimum and maximum use that amount.
 The slider runs linearly from **×10 to ×500** in steps of 10. Type any positive integer in the field and click **Apply** or
-press **Enter**, including ×1 or values above ×500. The field always displays
+press **Enter**, including ×1 or values above ×500, provided each ingredient
+request stays at or below 2147483647 items. The field always displays
 the actual factor; the slider shows the closest available step. New networks
 default to ×10. Networks still using the old ×1 default are adjusted once to ×10;
 other existing factors and explicit blueprint factors are preserved.
@@ -145,7 +162,7 @@ other existing factors and explicit blueprint factors are preserved.
 Changing the factor recalculates the network's ingredient request list and expands
 its inventory bar for the necessary stacks, subject to the chest's slot capacity.
 The setting is shared by all chests on the network and preserved by copy/paste and
-blueprints. Existing `craft:` networks adopt exact ingredient quantities at ×1.
+blueprints.
 Fluids cannot be stored in chests and are not included. Normal chests have their
 own manual-request interface; provider chests keep their existing request behavior.
 
@@ -185,7 +202,7 @@ outside icon tags; icon-only IDs use the full ID as their sort key.
 Use **Shift+right-click** on a configured chest to copy its settings, then
 **Shift+left-click** on another chest of the same type to paste them. Provider
 chests copy their complete item request list, replacing the destination requests.
-Linked chests join the source network. Linked chests request the exact recipe ingredients × a multiplier; provider
+Linked chests join the source network. Craft chests request the exact recipe ingredients × a multiplier; provider
 chests keep their one-stack-per-ingredient recipe import.
 
 **Ctrl+C**, **Ctrl+X** and blueprints retain provider requests and linked chest
@@ -222,12 +239,16 @@ Pinned items display current quantity and limit on the left side of your screen.
 
 ### Network-Based Architecture
 
-Unlike mods that process every chest individually, Global Network processes **networks**:
+Global Storage processes linked chest **networks**:
 
 - All chests with the same network ID share one linked inventory
 - The mod only needs to check each network once, not each chest
-- Scales to thousands of chests without performance impact
+- Additional linked chests on an existing network do not add separate inventory processing
 - Round-robin processing distributes load across ticks
+
+Provider chests and connected players are processed individually every 10 ticks.
+The linked-network batch handles up to 20 networks per processing run; with more
+networks, each network is visited less frequently.
 
 ---
 
@@ -273,7 +294,7 @@ Items above 1000 are collected to global storage. When any chest drops below 100
 
 ## Compatibility
 
-- **Factorio Version**: 2.0.77 or newer in the 2.0 series
+- **Factorio Version**: 2.1.23 or newer in the 2.1 series
 - **Multiplayer**: Supported
 - **Safe to add mid-game**: Yes
 
@@ -314,14 +335,16 @@ Upload the generated ZIP to the Mod Portal. To test locally, use this checkout i
 `mods/global-storage/` or put the ZIP directly in `mods/`, then enable Global Storage
 in Factorio's Mods menu. Use only one copy of this version at a time.
 
-Validation for this update was limited to static Lua compilation, checks against
-the bundled Factorio 2.0.77 API/prototypes, GUI behaviour with Lua API doubles,
-and ZIP inspection. Run `python tests/check_inventory_view.py` with Python and
+Validation for this update uses Lua syntax checks, inspection of the bundled
+Factorio 2.1.23 API/prototypes and regression checks with Lua API doubles.
+Run `python tests/check_inventory_view.py` with Python and
 `lupa` installed to check search, sorting, recipe captions and GUI events without
 starting the game. Factorio was not launched.
 Run `python tests/check_science_pool.py` to check science pack collection,
 durability preservation, limits, redistribution and personal trash with API doubles.
-In-game validation remains to be done: crafting and opening both chests, recipe
+Run `python tests/check_craft_configuration.py` to check craft settings after
+configuration changes and blueprint output reservations without starting the game.
+In-game validation remains to be done: crafting and opening all three chests, recipe
 copy/paste with a small inventory, provider requests without a linked network,
 personal requests with a full inventory and inactive sections, quality/spoilage
 preservation, network deletion, and loading an existing save.
