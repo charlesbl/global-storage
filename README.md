@@ -343,7 +343,10 @@ starting the game. Factorio was not launched.
 Run `python tests/check_science_pool.py` to check science pack collection,
 durability preservation, limits, redistribution and personal trash with API doubles.
 Run `python tests/check_craft_configuration.py` to check craft settings after
-configuration changes and blueprint output reservations without starting the game.
+configuration changes, blueprint output reservations and migration of 0.1.3 recipe
+networks without starting the game.
+Run `python tests/check_blueprint_paste.py` to check blueprint settings pasted onto
+existing chests and ghosts, including panel updates for all players viewing a chest.
 In-game validation remains to be done: crafting and opening all three chests, recipe
 copy/paste with a small inventory, provider requests without a linked network,
 personal requests with a full inventory and inactive sections, quality/spoilage

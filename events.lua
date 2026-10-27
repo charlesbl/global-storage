@@ -79,11 +79,9 @@ local function on_any_chest_destroyed(event)
     end
 end
 
---- Paste requests/network settings and refresh any open destination panels.
----@param event EventData.on_entity_settings_pasted
-local function on_entity_settings_pasted(event)
-    if not chest_settings.paste(event.source, event.destination) then return end
-    local destination = event.destination
+--- Refresh every player viewing the chest whose settings changed.
+local function refresh_chest_panels(destination)
+    if destination.type == "entity-ghost" then return end
     for _, player in pairs(game.players) do
         local pdata = state.get_player_data(player.index)
         if pdata.opened_chest and pdata.opened_chest.valid
@@ -98,6 +96,24 @@ local function on_entity_settings_pasted(event)
            and pdata.opened_provider_chest.unit_number == destination.unit_number then
             provider_gui.update(player, destination)
         end
+    end
+end
+
+---@param event EventData.on_entity_settings_pasted
+local function on_entity_settings_pasted(event)
+    if chest_settings.paste(event.source, event.destination) then
+        refresh_chest_panels(event.destination)
+    end
+end
+
+--- Blueprint overlays update existing chests without raising a build event.
+---@param event EventData.on_blueprint_settings_pasted
+local function on_blueprint_settings_pasted(event)
+    local entity = event.entity
+    if not entity or not entity.valid then return end
+    local tags = entity.type == "entity-ghost" and entity.tags or event.tags
+    if chest_settings.apply(entity, tags and tags[chest_settings.TAG]) then
+        refresh_chest_panels(entity)
     end
 end
 
@@ -386,6 +402,7 @@ function M.register()
     script.on_event(defines.events.script_raised_destroy, on_any_chest_destroyed, all_chests_filter)
 
     script.on_event(defines.events.on_player_setup_blueprint, chest_settings.on_player_setup_blueprint)
+    script.on_event(defines.events.on_blueprint_settings_pasted, on_blueprint_settings_pasted)
 
     -- Copy-paste
     script.on_event(defines.events.on_entity_settings_pasted, on_entity_settings_pasted)

@@ -1332,22 +1332,11 @@ function M.on_gui_event(event)
     if element.name == GUI.INVENTORY_ADD_LIMIT_BUTTON then
         local item_name = element.elem_value
         if item_name then
-            -- Check if item already exists in the cache
-            local pdata = state.get_player_data(player.index)
-            local cache = pdata.inventory_grid_cache
-            local existing = cache and cache[item_name]
-
-            if not existing then
-                -- Set default limit
+            -- Search/filter visibility does not determine whether an item is known.
+            if storage.inventory[item_name] == nil and storage.limits[item_name] == nil then
                 storage.limits[item_name] = 10000
-
-                -- Add new cell to inventory grid
-                local frame = player.gui.screen[GUI.NETWORK_FRAME]
-                local grid = frame and M.find_element(frame, GUI.INVENTORY_GRID)
-                if grid and grid.valid then
-                    M.add_grid_cell(grid, item_name, pdata)
-                end
             end
+            M.refresh_inventory_grid(player)
             element.elem_value = nil
         end
         return

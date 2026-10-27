@@ -45,12 +45,15 @@ end
 
 --- Preserve old chests/inventories as manual networks when introducing the craft prototype.
 function M.migrate_network_types()
-    if storage.chest_type_schema == 1 then return end
+    if storage.chest_type_schema == 2 then return end
     storage.recipe_networks = storage.recipe_networks or {}
-    for _, network in pairs(storage.networks or {}) do
+    local prefix = constants.COPY_PASTE_NETWORK_PREFIX
+    for name, network in pairs(storage.networks or {}) do
         network.entity_name = network.entity_name or constants.GLOBAL_CHEST_ENTITY_NAME
-        if network.entity_name == constants.GLOBAL_CHEST_ENTITY_NAME and network.craft_recipe then
-            network.legacy_recipe = network.craft_recipe
+        -- 0.1.3 stored only a craft: name and manual=false, without craft_recipe.
+        local legacy_name = network.manual == false and name:sub(1, #prefix) == prefix
+        if network.entity_name == constants.GLOBAL_CHEST_ENTITY_NAME and (network.craft_recipe or legacy_name) then
+            network.legacy_recipe = network.craft_recipe or name:sub(#prefix + 1)
             network.manual = true
             network.craft_recipe, network.craft_multiplier, network.craft_output_slots = nil, nil, nil
             network.craft_slot_layout_version = nil
@@ -65,7 +68,7 @@ function M.migrate_network_types()
             end
         end
     end
-    storage.chest_type_schema = 1
+    storage.chest_type_schema = 2
 end
 
 --- Initialize storage structure for new game

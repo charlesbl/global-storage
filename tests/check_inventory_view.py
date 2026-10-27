@@ -199,6 +199,42 @@ storage.inventory.other = 10
 gui.update_live(player)
 assert(pdata.inventory_grid_cache.other)
 
+-- Adding a limit must not overwrite an entry hidden by search or filters.
+local add_limit = gui.find_element(frame, G.INVENTORY_ADD_LIMIT_BUTTON)
+local function choose_limit(name)
+    add_limit.elem_value = name
+    gui.on_gui_elem_changed({element = add_limit, player_index = 1})
+    assert(add_limit.elem_value == nil)
+end
+search('iron')
+for _, limit in ipairs({-1, 275, 0}) do
+    storage.limits.copper = limit
+    assert(not pdata.inventory_grid_cache.copper)
+    choose_limit('copper')
+    assert(storage.limits.copper == limit, 'Hidden existing limit was overwritten')
+    assert(not pdata.inventory_grid_cache.copper, 'Added item bypassed search')
+end
+storage.limits.copper = nil -- Known stock without a limit remains blocked.
+choose_limit('copper')
+assert(storage.limits.copper == nil)
+storage.inventory.copper = nil
+storage.limits.copper = -1 -- A limit-only entry is also known storage data.
+choose_limit('copper')
+assert(storage.limits.copper == -1)
+search('')
+filter.state = true
+gui.on_gui_checked_state_changed({element = filter, player_index = 1})
+choose_limit('copper')
+assert(storage.limits.copper == -1 and not pdata.inventory_grid_cache.copper)
+prototypes.item.added = {localised_name = 'Added'}
+choose_limit('added')
+assert(storage.limits.added == 10000 and not pdata.inventory_grid_cache.added)
+filter.state = false
+gui.on_gui_checked_state_changed({element = filter, player_index = 1})
+assert(pdata.inventory_grid_cache.added and pdata.inventory_grid_cache.copper)
+assert(table.concat(pdata.inventory_order, ',') ==
+    table.concat(view.sorted(view.items(), pdata, view.sort_modes[pdata.inventory_sort]), ','))
+
 -- Removing a zero-stock entry must remove its HUD row too.
 pdata.pinned_items.new = true
 gui.add_item_to_hud(player, 'new')
@@ -217,6 +253,8 @@ local compact_hud = player.gui.left[G.PIN_HUD_FRAME]
 assert(not old_hud.valid and compact_hud ~= old_hud)
 assert(gui.find_element(compact_hud, G.PIN_SORT) == nil)
 assert(pdata.pin_sort == 4 and gui.find_element(frame, G.PIN_SORT).valid)
+
 ''')
 print("Passed: Lua syntax, translated/literal search, focus and filters,")
-print("independent inventory/HUD sorting, live stock reorder, recipe icons and locale changes.")
+print("independent inventory/HUD sorting, live stock reorder, recipe icons, locale changes")
+print("and preservation of hidden limits when adding inventory entries.")
