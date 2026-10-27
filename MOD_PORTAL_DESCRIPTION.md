@@ -2,7 +2,7 @@
 
 A powerful networked storage system that lets you manage items across your entire factory through a unified global inventory pool.
 
-**Version 0.1.4 introduces a third chest type.** Version 0.1.3 had two:
+**Version 1.4.1 introduces a third chest type.** Version 0.1.3 had two:
 the Global Chest and the Global Provider Chest. There are now **three**:
 Global Chest for manual storage networks, Global Craft Chest for recipe-driven
 networks, and Global Provider Chest for logistics bots.
@@ -101,7 +101,7 @@ distinct item output requires at least one slot; fluid-only outputs reserve none
 ## Upgrading from 0.1.3: Two Chest Types Become Three
 Previously, pasting an assembler or furnace recipe onto a normal Global Chest
 created a `craft:` network requesting one stack of each item ingredient.
-In 0.1.4, paste recipes onto the new **Global Craft Chest**, or select a recipe
+In 1.4.1, paste recipes onto the new **Global Craft Chest**, or select a recipe
 in its interface. It requests exact ingredient quantities multiplied by the
 shared craft factor (x10 by default), with dedicated input/output slot filters.
 Normal Global Chests now use manual requests and no longer import machine recipes.

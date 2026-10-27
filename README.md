@@ -14,7 +14,7 @@ Global Storage provides a **shared global inventory** that all your chests can a
 
 ## Chests
 
-Version 0.1.4 has **three chest types instead of two**. Version 0.1.3 provided
+Version 1.4.1 has **three chest types instead of two**. Version 0.1.3 provided
 the Global Chest and Global Provider Chest; this update adds the separate
 Global Craft Chest for recipe-driven networks.
 
@@ -61,7 +61,7 @@ to use the dedicated recipe controls.
 
 In 0.1.3, pasting an assembler or furnace recipe onto a normal Global Chest
 created a `craft:` network requesting one stack of each item ingredient. In
-0.1.4, machine recipe import belongs to the new Global Craft Chest, which uses
+1.4.1, machine recipe import belongs to the new Global Craft Chest, which uses
 exact ingredient quantities times its multiplier (×10 by default). Normal
 Global Chests keep manual requests and no longer import machine recipes.
 Old chests are not automatically replaced or converted; the new craft inventory
@@ -320,7 +320,7 @@ python scripts/build_mod.py
 ```
 
 The script reads the name and version from `info.json` and creates
-`dist/global-storage_0.1.4.zip`, containing a single `global-storage_0.1.4/` directory.
+`dist/global-storage_1.4.1.zip`, containing a single `global-storage_1.4.1/` directory.
 It validates the metadata and ZIP integrity and includes runtime files, locale,
 thumbnail, README and changelog. Git files, `.claude`, development scripts and generated
 artifacts are excluded. Identical inputs produce identical archives.
